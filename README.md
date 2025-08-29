@@ -93,7 +93,7 @@ This repo builds a basic MVP of what a truly **semantic log search platfrom** us
         - Service, timestamp, severity.
         - (if Loki/ELK present): link back to Grafana/Kibana with log context.
 
-5. **(Optional) Web UI**
+5. **Web UI**
     - Minimalistic React app UI where Engineers can:
         - Paste logs or stack traces.
         - View "similar logs" instantly.
@@ -109,7 +109,7 @@ This repo builds a basic MVP of what a truly **semantic log search platfrom** us
 
 ---
 
-## Contributing
+## Contributing(Coming Soon)
 
 Pull requests welcome - this is a hackable infra experiment, I honestly don't expect it to be big lol :-). My long-term goal is to basically have a production-ready semantic log search for DevOps teams.
 
