@@ -1,4 +1,6 @@
-# Vector-Enhanced Log & Metric Search (with Kubernetes + ChromaDB)
+# Vector-Enhanced Log & Metric Search
+
+This is a Kubernetes-native(by design) semantic log search layer that can plug into existing Loki/ELK setups, powered by embeddings and ChromaDB, with an optional standalone mode.
 
 Traditional log search (ELK, Loki, Splunk) is **keyword-based** - you only find exact matches. But logs often express the same error many different ways:
 
@@ -53,14 +55,18 @@ This repo builds a basic MVP of what a truly **semantic log search platfrom** us
 ## Components
 
 1. **Log Collector**
+    - Has 2 modes: **bootstrapped(default)** and **automated(for new users)**
+      1. Bootstrapped(default) mode assumes a user/team already runs Promtail/FluentBit -> Loki/ELK.
+      2. Automated(for new users) mode assumes a user/team doesn't have Loki/ELK setup, this is shipped with a Promtail/FluentBit DaemonSet YAML that sends logs directly to the Embedding Service. This does not require Loki.
     - Uses promtrail or FLuentBit as DaemonSets in Kubernetes.
     - Collect logs from app pods.
     - Forward logs both to **Loki/ELK** and to the embedding sidecar.
 
 2. **Embedding Sidecar**
-    - A small service that converts log lines into embeddings.
-    - Uses `sentence-transformers/all-MiniLM-L6-v2` (for now/testing).
-    - Pushes embeddings + metadata to ChromaDB.
+    - A small micro-service that accepts raw logs and converts log lines into embeddings.
+    - Uses a transformer, i.e, `sentence-transformers/all-MiniLM-L6-v2`, for logs to embeddings conversions.
+    - Packages log + metadata + embedding into a document.
+    - Pushes to ChromaDB.
 
     Example metadata:
     ```json
@@ -76,18 +82,30 @@ This repo builds a basic MVP of what a truly **semantic log search platfrom** us
     }
 
 3. **ChromaDB Service**
+    - Acts as the Vector database where log vector embeddings are indexed and stored.
+    - Runs as a StatefulSet in Kubernetes, providing persistent storage.
     - Stores vector embeddings of logs.
-    - Runs as a StatefulSet in Kubernetes.
 
 4. **Search API Service**
-    - Accepts queries (log text, stack traces).
-    - Converts to embedding.
-    - Queries ChromaDB for top-K similar logs.
-    - Returns logs + metadata + optional link back to ELK/Loki UI.
+    - Simple API endpoint(s) to; accept query log text, convert to embedding, query ChromaDB(through chromadb service), etc.
+    - Results include:
+        - Raw log text.
+        - Service, timestamp, severity.
+        - (if Loki/ELK present): link back to Grafana/Kibana with log context.
 
 5. **(Optional) Web UI**
-    - React dashboard for semantic search.
-    - Paste logs -> see similar results instantly.
+    - Minimalistic React app UI where Engineers can:
+        - Paste logs or stack traces.
+        - View "similar logs" instantly.
+        - Click a result to jump into Loki/Grafana/Kibana/etc (if integrated).
+
+---
+
+## Project Modes
+
+1. **Bootstrapped**: Assumes a user/team has Loki/ELK already setup and in use. Please read our instructions for tapping into your logs(Coming Soon).
+
+2. **Automated**: Assumes user/team does not have Loki/ELK set up, includes an already provisioned Promtail(or whatever you'd want to use) DaemonSet YAML -> Logs -> Embedding Service -> ChromaDB.
 
 ---
 
@@ -97,4 +115,4 @@ Pull requests welcome - this is a hackable infra experiment, I honestly don't ex
 
 ---
 
-Built with ❤️ for Alma Nadine
+Built with ❤️ for A1m4 N4d1n3 a.k.a miss ma'am :)
