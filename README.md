@@ -31,19 +31,19 @@ This repo builds a basic MVP of what a truly **semantic log search platfrom** us
 └───────┬──────┘
         │
  ┌──────▼────────┐
- │ Log Collector │  (FluentBit / Promtail)
+ │ Log Collector │
  └──────┬────────┘
         │
 ┌───────▼────────┐
-│  Log Storage   │  (Loki / ELK)
-└───────┬────────┘
-        │ (sidecar / stream)
-┌───────▼────────┐
-│ Embedding Svc  │  (MiniLM, BERT, CLIP)
+│  Log Storage   │
 └───────┬────────┘
         │
 ┌───────▼────────┐
-│   ChromaDB     │  (vector index)
+│ Embedding Svc  │
+└───────┬────────┘
+        │
+┌───────▼────────┐
+│   ChromaDB     │
 └────────────────┘
 
 ```
@@ -75,11 +75,11 @@ This repo builds a basic MVP of what a truly **semantic log search platfrom** us
         }
     }
 
-3. **ChromaDB**
+3. **ChromaDB Service**
     - Stores vector embeddings of logs.
     - Runs as a StatefulSet in Kubernetes.
 
-4. **Search API**
+4. **Search API Service**
     - Accepts queries (log text, stack traces).
     - Converts to embedding.
     - Queries ChromaDB for top-K similar logs.
@@ -94,3 +94,7 @@ This repo builds a basic MVP of what a truly **semantic log search platfrom** us
 ## Contributing
 
 Pull requests welcome - this is a hackable infra experiment, I honestly don't expect it to be big lol :-). My long-term goal is to basically have a production-ready semantic log search for DevOps teams.
+
+---
+
+Built with ❤️ for Alma Nadine
