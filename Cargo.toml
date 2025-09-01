@@ -3,4 +3,11 @@ name = "Vector-Enhanced-Search"
 version = "0.1.0"
 edition = "2024"
 
+[workspace]
+members = [
+    "services/search-api",
+    "services/embedding-service",
+    "services/chromadb",
+]
+
 [dependencies]
