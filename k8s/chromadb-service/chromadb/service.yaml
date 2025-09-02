@@ -3,8 +3,8 @@ kind: Service
 metadata:
   name: chromadb-clusterip
 spec:
-  # Change to NodePort to expose outside the cluster for developers/testing
-  type: ClusterIP
+  # inter-change to NodePort to expose outside the cluster for developers/testing
+  type: NodePort
   selector:
     app: chromadb
   ports:

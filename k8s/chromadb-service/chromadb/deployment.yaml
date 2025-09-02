@@ -15,11 +15,15 @@ spec:
         app: chromadb
     spec:
       containers:
+        # Otel-Collector and Zipkin are ran on separate pods to allow for different scaling options
         - name: chromadb
           image: chromadb/chroma:1.0.21.dev43
           imagePullPolicy: Always
           ports:
             - containerPort: 8000
+          volumeMounts:
+            - name: chromadb-storage
+              mountPath: /chroma/chroma
           env:
             - name: IS_PERSISTENT
               value: "TRUE"
@@ -31,3 +35,7 @@ spec:
               value: "http://otel-collector:4317"
             - name: CHROMA_OPEN_TELEMETRY__SERVICE_NAME
               value: chroma
+      volumes:
+        - name: chromadb-storage
+          persistentVolumeClaim:
+            claimName: chromadb-pv-claim
