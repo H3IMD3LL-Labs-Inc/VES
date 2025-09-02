@@ -1,3 +1,4 @@
+# Running/Testing Locally run `docker compose up -d` inside the folder with this file
 version: "3.0"
 services:
   chromadb:

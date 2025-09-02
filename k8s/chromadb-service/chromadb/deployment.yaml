@@ -20,3 +20,14 @@ spec:
           imagePullPolicy: Always
           ports:
             - containerPort: 8000
+          env:
+            - name: IS_PERSISTENT
+              value: "TRUE"
+            - name: PERSISTENT_DIRECTORY
+              value: "/chroma/chroma"
+            - name: ANONYMIZED_TELEMETRY
+              value: "TRUE"
+            - name: CHROMA_OPEN_TELEMETRY__ENDPOINT
+              value: "http://otel-collector:4317"
+            - name: CHROMA_OPEN_TELEMETRY__SERVICE_NAME
+              value: chroma
