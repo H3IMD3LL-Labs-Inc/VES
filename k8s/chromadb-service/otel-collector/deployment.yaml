@@ -3,7 +3,7 @@ kind: Deployment
 metadata:
   name: otel-collector
 spec:
-  replicas: 1
+  replicas: 3 # Change based on preference and scaling requirements
   selector:
     matchLabels:
       app: otel-collector
