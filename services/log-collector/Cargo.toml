@@ -1,0 +1,11 @@
+[package]
+name = "log-collector"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+anyhow.workspace = true
+tokio.workspace = true
+tokio-stream.workspace = true
+notify.workspace = true
+serde.workspace = true
