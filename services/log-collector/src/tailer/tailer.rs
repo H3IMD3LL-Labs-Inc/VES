@@ -15,7 +15,7 @@ pub struct Tailer {
 
 /// Tailer initialization
 impl Tailer {
-    pub async fn new_tailer(&mut self, file_path: PathBuf, file_offset: u64, file_handle: String) {
+    pub async fn new_tailer(&mut self) {
         let file = match File::open(file_path).await {
             Ok(file) => file,
             Err(why) => panic!("Couldn't open {}: {}", file_path.display(), why),
