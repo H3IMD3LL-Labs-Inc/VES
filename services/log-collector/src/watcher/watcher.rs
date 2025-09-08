@@ -45,6 +45,76 @@ struct LogWatcher {
     active_files: HashMap<u64, PathBuf>,
 }
 
+/// File state struct implementation
+impl FileState {
+    /// Recalculate file current state based on the filesystem
+    async fn determine_file_state(&self) -> FileState {
+        // Query file metadata
+        let metadata = tokio::fs::metadata(&self.path)
+            .await
+            .expect("Failed to get file metadata for file");
+
+        // Platform-specific ways of extracting file inode:
+        // metadata.ino() requires nix or libc crate
+        #[cfg(unix)]
+        let inode = {
+            use std::os::unix::fs::MetadataExt;
+            metadata.ino()
+        };
+
+        // File Offset
+        let offset = metadata.len();
+
+        FileState {
+            path: self.path.clone(),
+            inode,
+            offset,
+        }
+    }
+}
+
+/// Checkpoint struct implementation
+impl Checkpoint {
+    /// Reads the checkpoint file from disk, it it exists
+    async fn load_checkpoint(self, path: &PathBuf) -> Result<Checkpoint> {
+        // Fetch/Check if the checkpoint actually exists
+        // if it exists fetch the filestate, and compare it to
+        // the file state of the saved checkpoint in disk
+        if self.files.contains_key(path) {}
+
+        // Return it if it exists, if not show a message/error indicating it doesn't exist
+    }
+
+    /// Saves the current watcher's file state to the checkpoint file
+    async fn save_checkpoint(
+        &self,
+        save_path: &Path,
+        file_path: PathBuf,
+        file_inode: u64,
+        file_offset: u64,
+    ) -> Result<Checkpoint> {
+        // Determine the file's current state
+        let file_state = FileState {
+            path: file_path,
+            inode: file_inode,
+            offset: file_offset,
+        };
+
+        // File state snapshot
+        let new_state = file_state.determine_file_state().await;
+
+        // Create a new checkpoint JSON file and store it
+        let checkpoint_data = serde_json::to_string_pretty(&new_state)?;
+
+        // Persist it on disk and add its checkpoint_path to LogWatcher
+        tokio::fs::write(save_path, checkpoint_data).await?;
+        
+        Checkpoint {
+            files: HashMap<file_state.path,
+        }
+    }
+}
+
 /// Log watcher struct implementation
 impl LogWatcher {
     /// Creates a new log watcher instance and loads the last checkpoint.
