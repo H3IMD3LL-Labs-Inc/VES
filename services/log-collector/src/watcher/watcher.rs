@@ -1,9 +1,12 @@
 use anyhow::{Context, Result};
 use notify::{Event, RecommendedWatcher, RecursiveMode, Watcher};
 use serde::{Deserialize, Serialize};
+use serde_json::{Result, Value};
 use std::collections::HashMap;
+use std::fmt::Error;
 use std::fs;
 use std::io::{Seek, SeekFrom};
+use std::os::unix::fs::MetadataExt;
 use std::path::{Path, PathBuf};
 use tokio::fs::File;
 use tokio::io::{AsyncBufReadExt, BufReader};
@@ -11,17 +14,14 @@ use tokio::sync::mpsc;
 use tokio::task;
 use tokio_stream::StreamExt;
 
-use crate::tailer;
+use crate::tailer::Tailer;
 
-/// Constants
-/// TODO: Handle with config.rs
+/// TODO: Handle with config.rs, maybe idk LOL :)
 const CHECKPOINT_PATH: &str = "/path/to/checkpoint.json";
 const LOG_DIR: &str = "/var/log/containers";
 const POD_LOG_DIR: &str = "/var/log/pods";
 const POLL_INTERNAL_SECS: u64 = 5; // Fallback poll interval
 
-/// State representation of a single log file, used for checkpointing.
-/// Must be serializable and deserializable
 #[derive(Debug, Serialize, Deserialize)]
 struct FileState {
     path: PathBuf,
@@ -29,14 +29,12 @@ struct FileState {
     offset: u64,
 }
 
-/// A map of file paths to their last known state, for persistent tracking.
 #[derive(Debug, Default, Serialize, Deserialize)]
 struct Checkpoint {
     files: HashMap<PathBuf, FileState>,
 }
 
 /// Main log watcher struct.
-/// Contains state needed to manage the watching process.
 #[derive(Debug, Serialize, Deserialize)]
 struct LogWatcher {
     log_dir: PathBuf,
@@ -45,24 +43,20 @@ struct LogWatcher {
     active_files: HashMap<u64, PathBuf>,
 }
 
-/// File state struct implementation
+/// FileState Methods
 impl FileState {
-    /// Recalculate file current state based on the filesystem
+    /// Recalculate file current state based on the filesystem (Currently only supports Unix/Unix-like OS)
     async fn determine_file_state(&self) -> FileState {
-        // Query file metadata
         let metadata = tokio::fs::metadata(&self.path)
             .await
             .expect("Failed to get file metadata for file");
 
-        // Platform-specific ways of extracting file inode:
-        // metadata.ino() requires nix or libc crate
         #[cfg(unix)]
         let inode = {
             use std::os::unix::fs::MetadataExt;
             metadata.ino()
         };
 
-        // File Offset
         let offset = metadata.len();
 
         FileState {
@@ -73,55 +67,83 @@ impl FileState {
     }
 }
 
-/// Checkpoint struct implementation
+/// Checkpoint Methods
 impl Checkpoint {
     /// Reads the checkpoint file from disk, it it exists
-    async fn load_checkpoint(self, path: &PathBuf) -> Result<Checkpoint> {
-        // Fetch/Check if the checkpoint actually exists
-        // if it exists fetch the filestate, and compare it to
-        // the file state of the saved checkpoint in disk
-        if self.files.contains_key(path) {}
+    async fn load_checkpoint(&mut self, saved_file_path: &Path) -> Result<()> {
+        let saved_file_path_buf = saved_file_path.to_path_buf();
 
-        // Return it if it exists, if not show a message/error indicating it doesn't exist
+        if self.files.contains_key(&saved_file_path_buf) {
+            let contents = tokio::fs::read_to_string(&saved_file_path).await?;
+
+            let checkpoint_data: Checkpoint = serde_json::from_str(&contents)
+                .map_err(|e| anyhow::anyhow!("Failed to deserialized JSON: {e}"))?;
+
+            let disk_file_state = checkpoint_data.files.get(&saved_file_path_buf);
+            let in_memory_file_state = self.files.get(&saved_file_path_buf);
+
+            match (disk_file_state, in_memory_file_state) {
+                (Some(disk), Some(memory)) => {
+                    if disk.inode == memory.inode {
+                        // TODO: Same file -> Safe to restore
+                    } else {
+                        // TODO: Different inode -> File was rotated or replaced
+                    }
+                }
+                (Some(disk), None) => {
+                    // TODO: Decide what to do in this case
+                }
+                (None, Some(_mem)) => {
+                    // TODO: Decide what to do in this case
+                }
+                // No need to match (None, None), we already confirmed the file exists with .contains_key()
+                (None, None) => {
+                    // No need to match (None, None), we already confirmed the file exists with .contains_key()
+                }
+            }
+        } else {
+            eprintln!(
+                "File {:?} not found in in-memory checkpoint",
+                saved_file_path_buf
+            );
+        }
+
+        Ok(())
     }
 
-    /// Saves the current watcher's file state to the checkpoint file
     async fn save_checkpoint(
-        &self,
+        &mut self,
         save_path: &Path,
         file_path: PathBuf,
         file_inode: u64,
         file_offset: u64,
-    ) -> Result<Checkpoint> {
-        // Determine the file's current state
+    ) -> Result<()> {
         let file_state = FileState {
-            path: file_path,
+            path: file_path.clone(),
             inode: file_inode,
             offset: file_offset,
         };
 
-        // File state snapshot
-        let new_state = file_state.determine_file_state().await;
+        self.files.insert(file_path, file_state);
 
-        // Create a new checkpoint JSON file and store it
-        let checkpoint_data = serde_json::to_string_pretty(&new_state)?;
+        let checkpoint_data_json = serde_json::to_string_pretty(&self)?;
 
-        // Persist it on disk and add its checkpoint_path to LogWatcher
-        tokio::fs::write(save_path, checkpoint_data).await?;
-        
-        Checkpoint {
-            files: HashMap<file_state.path,
-        }
+        tokio::fs::write(save_path, checkpoint_data_json).await?;
+
+        Ok(())
     }
 }
 
 /// Log watcher struct implementation
 impl LogWatcher {
-    /// Creates a new log watcher instance and loads the last checkpoint.
+    /// Creates a new log watcher instance and loads the last checkpoint, if it exists.
     pub async fn new_watcher(log_dir: PathBuf, checkpoint_path: PathBuf) -> Result<Self> {
-        let checkpoint = Self::load_checkpoint(&checkpoint_path)
-            .await
-            .unwrap_or_default();
+        let mut checkpoint = Checkpoint {
+            files: HashMap::new(),
+        };
+
+        checkpoint.load_checkpoint(&checkpoint_path).await?;
+
         Ok(Self {
             log_dir,
             checkpoint_path,
@@ -129,6 +151,7 @@ impl LogWatcher {
             active_files: HashMap::new(),
         })
     }
+
     /// Main async loop that orchestrates the watcher
     pub async fn run_watcher(&mut self) -> Result<()> {
         let (tx, rx) = tokio::sync::mpsc::channel(100);
@@ -144,18 +167,13 @@ impl LogWatcher {
 
         let mut event_rx = tokio_stream::wrappers::ReceiverStream::new(rx);
 
-        // Initial discovery of files and state
-        // TODO: Implement `discover_initial_files()` method
         self.discover_initial_files().await?;
 
         loop {
             tokio::select! {
-                // Wait for filesystem events
                 Some(event) = event_rx.next() => {
                     self.handle_event(event).await?;
                 }
-
-                // Fallback polling for files, especially for log retention on some systems
                 _ = tokio::time::sleep(tokio::time::Duration::from_secs(POLL_INTERNAL_SECS)) => {
                     self.discover_new_files().await?;
                 }
@@ -191,61 +209,77 @@ impl LogWatcher {
         Ok(())
     }
 
-    /// TODO: Implement `discover_initial_files()` method used in `run_watcher()` method
+    /// Discovers initial log files when a new watcher starts
+    async fn discover_initial_files(&mut self) -> Result<()> {
+        // TODO: Initial file discovery
+
+        // TODO: State tracking for initially discovered files
+
+        Ok(())
+    }
 
     /// Discovers new files that might have been missed by `notify`
     pub async fn discover_new_files(&mut self) -> Result<()> {
-        let mut entries = fs::read_dir(&self.log_dir)?;
-        while let Some(OK(entry)) = entries.next() {
+        let entries = fs::read_dir(&self.log_dir)?;
+
+        for entry in entries {
+            let entry = entry?;
             let path = entry.path();
+
+            // Only consider `.log` files
             if path.extension().map_or(false, |ext| ext == "log") {
-                self.handle_new_file(&path).await?;
-            },
+                let metadata = entry.metadata()?;
+                let inode = metadata.ino();
+
+                self.handle_new_file(inode, &path).await?;
+            }
         }
+
+        Ok(())
     }
 
-    /// Handle newly discovered files
+    /// Handles newly discovered files
     async fn handle_new_file(&mut self, inode: u64, path: &Path) -> Result<()> {
         if self.active_files.contains_key(&inode) {
             return Ok(());
         } else {
             let new_file_path = path.clone().to_path_buf();
             self.active_files.insert(inode, new_file_path);
-        }
 
-        // TODO: Use the `new` Tailer function if the file is confirmed to be new
+            let mut tailer = Tailer {
+                file_path: PathBuf::from(new_file_path),
+                file_offset: 0,
+                file_handle: String::new(),
+            };
+
+            // NOTE: This currently does not have a shutdown/stop mechanism.
+            // Will run in a perpetual loop.
+            tailer.new_tailer().await;
+
+            self.checkpoint
+                .save_checkpoint(&self.checkpoint_path, path.to_path_buf(), inode, 0)
+                .await?;
+        }
 
         Ok(())
     }
 
-    /// Handles file changes(modification)
+    /// Handles untracked file changes (missed modification)
     async fn handle_file_change(&mut self, path: &Path) -> Result<()> {
-        // 1. We lost track somehow, treat is as a new file
+        // TODO: We lost track of a file somehow, treat is as a new file
 
         // Otherwise, tailer already handles new writes, so nothing to do
         Ok(())
     }
 
-    /// Handle file removal
+    /// Handles file removal (deletion - whether intentional or accidental)
     async fn handle_file_removal(&mut self, path: &Path) -> Result<()> {
-        // 1. Find file inode
-
+        // TODOs:
+        // 1. Find file inode in active
         // 2. Remove from active files
-
         // 3. Remove from checkpoint (or mark as closed to avoid unnecessary waste)
-
         // 4. Save checkpoint so we don't try resuming it
 
         Ok(())
-    }
-
-    /// Reads the checkpoint file from disk, it it exists
-    async fn load_checkpoint(path: &Path) -> Result<Checkpoint> {
-        // ... (Async logic to read JSON from file)
-    }
-
-    /// Saves the current watcher state to the checkpoint file
-    async fn save_checkpoint(&self) -> Result<()> {
-        // ... (Async logic to serialize Checkpoint to JSON and write to file)
     }
 }
