@@ -1,3 +1,36 @@
+/// ================================================================================================================
+///
+///         THE FOLLOWING STILL HAS NOT BEEN IMPLEMENTED, BE ADVISED WHILE USING AND WORKING ON THIS MODULE
+///
+/// ================================================================================================================
+///
+/// 1. No shutdown/cleanup for spawned Tailers
+///    - Once a tailer is started, it runs indefinitely. If log files rotate heavily this
+///      could spawn too many tasks
+///
+/// 2. Checkpoint recovery is stubbed out
+///    - `load_checkpoint()` reads but does not actually restor offsets into running `Tailers` yet.
+///
+/// 3. Backpressure and Error handling
+///    - If log volume is very high, `tx.blocking_send(event)` could clog the channel
+///    - No retry/recovery strategy on checkpoint save failures.
+///
+/// 4. Concurrency Issues
+///    - `handle_new_file()` awaits `tailer.new_tailer().await` inline, blocking the watcher loop
+///      , while `discover_initial_files()` uses `tokio::spawn`. This inconsistency might cause the
+///      watcher to "stall" while running if a tailer blocks.
+///
+/// 5. Cross-platform limitations
+///    - Hardcoded to Unix/Unix-like OS. Currently won't run on windows without modification
+///
+/// 6. Configs are hardcoded
+///    - Paths like `/var/log/containers` and `/path/to/checkpoint.json` are not configurable yet.
+///      This was by design as I built the system to monitor Kubernetes/CRI format logs in my Kubernetes
+///      personal projects.
+///
+/// - DennisN22042003(GitHub)
+///
+/// ===============================================================================================================
 use anyhow::Result;
 use notify::{Event, RecommendedWatcher, RecursiveMode, Watcher};
 use serde::{Deserialize, Serialize};
