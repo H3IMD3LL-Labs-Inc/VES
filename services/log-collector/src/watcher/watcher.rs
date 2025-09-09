@@ -186,7 +186,9 @@ impl LogWatcher {
         match event.kind {
             notify::EventKind::Create(notify::event::CreateKind::File) => {
                 for path in &event.paths {
-                    self.handle_new_file(path).await?;
+                    let metadata = tokio::fs::metadata(path).await?;
+                    let inode = metadata.ino();
+                    self.handle_new_file(inode, path).await?;
                 }
             }
             notify::EventKind::Modify(notify::event::ModifyKind::Data(_)) => {
@@ -211,9 +213,46 @@ impl LogWatcher {
 
     /// Discovers initial log files when a new watcher starts
     async fn discover_initial_files(&mut self) -> Result<()> {
-        // TODO: Initial file discovery
+        let mut entries = tokio::fs::read_dir(&self.log_dir).await?;
 
-        // TODO: State tracking for initially discovered files
+        while let Some(entry) = entries.next_entry().await? {
+            let path = entry.path();
+
+            // Only handle .log files
+            if path.extension().map_or(false, |ext| ext == "log") {
+                // Check if a checkpoint for this file already exists
+                let (inode, offset) = match tokio::fs::metadata(&path).await {
+                    Ok(metadata) => (metadata.ino(), {
+                        self.checkpoint
+                            .files
+                            .get(&path)
+                            .map(|f| f.offset)
+                            .unwrap_or(0)
+                    }),
+                    Err(_) => continue,
+                };
+
+                // Track in active_files
+                self.active_files.insert(inode, path.clone());
+
+                // Start a tailer
+                let mut tailer = Tailer {
+                    file_path: path.clone(),
+                    file_offset: offset,
+                    file_handle: String::new(),
+                };
+                tokio::spawn(async move {
+                    let _ = tailer.new_tailer().await;
+                });
+
+                // If file is new(not in LogWatcher.checkpoint), save it
+                if !self.checkpoint.files.contains_key(&path) {
+                    self.checkpoint
+                        .save_checkpoint(&self.checkpoint_path, path, inode, 0)
+                        .await?;
+                }
+            }
+        }
 
         Ok(())
     }
@@ -265,6 +304,7 @@ impl LogWatcher {
     }
 
     /// Handles untracked file changes (missed modification)
+    /// This will not be implemented until a use-case is determined ;-)
     async fn handle_file_change(&mut self, path: &Path) -> Result<()> {
         // TODO: We lost track of a file somehow, treat is as a new file
 
@@ -274,11 +314,58 @@ impl LogWatcher {
 
     /// Handles file removal (deletion - whether intentional or accidental)
     async fn handle_file_removal(&mut self, path: &Path) -> Result<()> {
-        // TODOs:
-        // 1. Find file inode in active
-        // 2. Remove from active files
-        // 3. Remove from checkpoint (or mark as closed to avoid unnecessary waste)
-        // 4. Save checkpoint so we don't try resuming it
+        let file_path_buf = path.to_path_buf();
+
+        // Check if tracking this file in memory
+        if let Some(file_state) = self.checkpoint.files.get(&file_path_buf) {
+            // Try to get metadata from disk
+            match tokio::fs::metadata(&file_path_buf).await {
+                Ok(metadata) => {
+                    // File exists on disk
+                    let inode_on_disk = metadata.ino();
+
+                    if inode_on_disk != file_state.inode {
+                        // Inode differe -> file was rotated/replaced
+                        println!(
+                            "File rotated: {:?}, old inode: {}, new inode: {}",
+                            file_path_buf, file_state.inode, inode_on_disk
+                        );
+
+                        // Reset offset or create a new FileState
+                        self.checkpoint
+                            .save_checkpoint(
+                                &self.checkpoint_path,
+                                file_path_buf.clone(),
+                                inode_on_disk,
+                                0,
+                            )
+                            .await?;
+                    } else {
+                        // Same inode -> file is still valid, nothing to do
+                    }
+                }
+                Err(_) => {
+                    // File not present on disk -> true deletion
+                    println!("File deleted on disk: {:?}", file_path_buf);
+
+                    // Remove from in-memory active_files
+                    self.active_files.retain(|_, p| p != &file_path_buf);
+
+                    // Remove from Checkpoint
+                    self.checkpoint.files.remove(&file_path_buf);
+
+                    // Save updated Checkpoint
+                    let _ = serde_json::to_string_pretty(&self.checkpoint)
+                        .map(|data| tokio::fs::write(&self.checkpoint_path, data));
+                }
+            }
+        } else {
+            // Not a tracked file, ignore
+            println!(
+                "File ignored for removal: {:?}, this file is not being tracked.",
+                file_path_buf
+            );
+        }
 
         Ok(())
     }
