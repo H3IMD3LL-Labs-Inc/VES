@@ -1,0 +1,19 @@
+# Module labels
+log-collector:
+  - 'services/log-collector/**'
+chromadb:
+  - 'services/chromadb/**'
+search-api:
+  - 'services/search-api/**'
+embedding-service:
+  - 'services/embedding-service/**'
+
+  # Infrastructure / setup
+  docker:
+    - 'docker/**'
+  kubernetes:
+    - 'k8s/**'
+  scripts:
+    - 'scripts/**'
+  github:
+    - '.github/**'
