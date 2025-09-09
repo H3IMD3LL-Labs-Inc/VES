@@ -1,4 +1,5 @@
 use anyhow::{Context, Result};
+use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 use tokio::fs::File;
 use tokio::io::{self, AsyncBufReadExt, BufReader};
@@ -8,20 +9,20 @@ use tokio::time::{Duration, sleep};
 /// Tailer struct
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Tailer {
-    file_path: PathBuf,
-    file_offset: u64,
-    file_handle: String,
+    pub file_path: PathBuf,
+    pub file_offset: u64,
+    pub file_handle: String,
 }
 
 /// Tailer initialization
 impl Tailer {
-    pub async fn new_tailer(&mut self) {
-        let file = match File::open(file_path).await {
+    pub async fn new_tailer(&mut self) -> Result<()> {
+        let mut file = match File::open(&self.file_path).await {
             Ok(file) => file,
-            Err(why) => panic!("Couldn't open {}: {}", file_path.display(), why),
+            Err(why) => panic!("Couldn't open {}: {}", &self.file_path.display(), why),
         };
 
-        file.seek(SeekFrom::Start(file_offset)).await?;
+        file.seek(SeekFrom::Start(self.file_offset)).await?;
         let mut reader = BufReader::new(file);
 
         loop {
@@ -34,6 +35,8 @@ impl Tailer {
             } else {
                 // Continue reading the file until the end
             }
+
+            return Ok(());
         }
     }
 }
