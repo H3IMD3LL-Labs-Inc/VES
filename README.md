@@ -1,5 +1,8 @@
 # VES - Vector Enhanced Search (for logs)
 
+⚠️ Status: Pre-MVP (only log file watcher prototype exists).
+Expect breaking changes, incomplete features, and rapid iteration.
+
 > Kubernetes-native semantic log search for modern DevOps teams.
 > Plug into existing log collection setups or run standalone, powered by an embedding sidecar + ChromaDB.
 
@@ -138,6 +141,33 @@ This project is licensed under the [Business Source License 1.1](./LICENSE).
 - [Email](mailto:dennis.njuguna@heimdelllabs.cloud)
 - [Website](https://heimdelllabs.cloud/)
 - [Discord(Coming Soon)]()
+
+---
+
+## 📍 Roadmap
+- [x] v0.0.0 - Pre-MVP: dev logs, README, roadmap, discussions.
+
+- [ ] v0.0.1 - MVP: log-collector, embedding-service, API-Service, Web UI
+    - Log Collector
+      ![25%](https://progress-bar.xyz/25/?style=minimal-matte)
+    - Embedding Service
+      ![0%](https://progress-bar.xyz/0/?style=minimal-matte)
+    - API Service
+      ![0%](https://progress-bar.xyz/0/?style=minimal-matte)
+
+- [ ] v0.1.0 - Improvements: Documentation and Stability
+    - Documentation
+      ![25%](https://progress-bar.xyz/25/?style=minimal-matte)
+    - Stability
+      ![0%](https://progress-bar.xyz/0/?style=minimal-matte)
+
+- [ ] v1.0.0 - Production-ready release: Further Documentation, Stability improvements and User Support
+    - Further Documentation
+      ![0%](https://progress-bar.xyz/0/?style=minimal-matte)
+    - Stability improvements
+      ![0%](https://progress-bar.xyz/0/?style=minimal-matte)
+    - User Support
+      ![0%](https://progress-bar.xyz/0/?style=minimal-matte)
 
 ---
 
