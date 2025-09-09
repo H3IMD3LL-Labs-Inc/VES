@@ -1,0 +1,18 @@
+blank_issues_enabled: false
+
+contact_links:
+  - name: 🔒 Security Policy
+    url: https://github.com/H3IMD3LL-Labs-Inc/VES-Vector-Enhanced-Search-/security/policy
+    about: Please report security vulnerabilities privately via our Security Policy.
+
+  - name: 💬 Questions & Discussions
+    url: https://github.com/H3IMD3LL-Labs-Inc/VES-Vector-Enhanced-Search-/discussions
+    about: Please ask usage questions, share feedback, or propose ideas in Discussions.
+
+  - name: 📖 Documentation
+    url: https://github.com/H3IMD3LL-Labs-Inc/VES-Vector-Enhanced-Search-/blob/main/README.md
+    about: Check out our README for setup instructions, roadmap, and contribution guidelines.
+
+  - name: 📧 Contact Maintainers
+    url: https://github.com/H3IMD3LL-Labs-Inc/VES-Vector-Enhanced-Search-readme#-community--support
+    about: For inquiries about licensing, partnerships, or private support.
