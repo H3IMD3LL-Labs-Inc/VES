@@ -123,7 +123,7 @@ kubectl apply -f deploy/ves.yaml
 
 ## 🤝 Contributing
 Contributors are welcome!
-Please see our upcoming [CONTRIBUTING.md](./CONTRIBUTING) and [CODE_OF_CONDUCT.md](./CODE_OF_CONDUCT).
+Please see our upcoming [CONTRIBUTING](./CONTRIBUTING.md) and [CODE_OF_CONDUCT](./CODE_OF_CONDUCT.md).
 
 This is currently a v0.1 hackable infra experiment — long-term goal(afew months): ➡️ production-ready semantic log search for DevOps teams.
 

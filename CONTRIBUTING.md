@@ -44,7 +44,7 @@ VES is still in its early stage (`v0.0.x`), so contributions of **any size** —
 
 ## 🔒 Security
 
-Please do not report security vulnerabilities in public issues. See our [Security.md](./SECURITY) for responsible disclosure guidelines.
+Please do not report security vulnerabilities in public issues. See our [Security Policy](./SECURITY.md) for responsible disclosure guidelines.
 
 ## 📍 Roadmap
 
