@@ -1,20 +1,13 @@
-use anyhow::{Context, Result};
+use anyhow::Result;
 use notify::{Event, RecommendedWatcher, RecursiveMode, Watcher};
 use serde::{Deserialize, Serialize};
-use serde_json::{Result, Value};
 use std::collections::HashMap;
-use std::fmt::Error;
 use std::fs;
-use std::io::{Seek, SeekFrom};
 use std::os::unix::fs::MetadataExt;
 use std::path::{Path, PathBuf};
-use tokio::fs::File;
-use tokio::io::{AsyncBufReadExt, BufReader};
-use tokio::sync::mpsc;
-use tokio::task;
 use tokio_stream::StreamExt;
 
-use crate::tailer::Tailer;
+use crate::tailer::tailer::Tailer;
 
 /// TODO: Handle with config.rs, maybe idk LOL :)
 const CHECKPOINT_PATH: &str = "/path/to/checkpoint.json";
@@ -191,6 +184,7 @@ impl LogWatcher {
                     self.handle_new_file(inode, path).await?;
                 }
             }
+            // TODO: Not useable until I implement `handle_file_change()`
             notify::EventKind::Modify(notify::event::ModifyKind::Data(_)) => {
                 for path in &event.paths {
                     self.handle_file_change(path).await?;
@@ -283,13 +277,14 @@ impl LogWatcher {
             return Ok(());
         } else {
             let new_file_path = path.clone().to_path_buf();
-            self.active_files.insert(inode, new_file_path);
 
             let mut tailer = Tailer {
-                file_path: PathBuf::from(new_file_path),
+                file_path: new_file_path.clone(),
                 file_offset: 0,
                 file_handle: String::new(),
             };
+
+            self.active_files.insert(inode, new_file_path);
 
             // NOTE: This currently does not have a shutdown/stop mechanism.
             // Will run in a perpetual loop.
