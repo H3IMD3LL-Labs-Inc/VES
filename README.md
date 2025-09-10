@@ -1,6 +1,6 @@
 # VES - Vector Enhanced Search (for logs)
 
-⚠️ Status: Pre-MVP (only log file watcher prototype exists).
+⚠️ Status: Pre-MVP.
 Expect breaking changes, incomplete features, and rapid iteration.
 
 > Kubernetes-native semantic log search for modern DevOps teams.
