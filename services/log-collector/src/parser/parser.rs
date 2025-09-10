@@ -42,14 +42,14 @@ enum SyslogVariant {
 /// matches one of the supported log formats in [`LogFormat`],
 /// which is defined in [`crate::parser`].
 ///
-/// Returns a [`LogFormat`] enum describing the detected type.
-///
 /// - If log format does not match `LogFormat::CRI`,
 /// `LogFormat::DockerJSON`, `LogFormat::ArbitraryJSON` or
 /// `LogFormat::Syslog(SyslogVariant)` detection will default
 /// to `LogFormat::PlainText`
 ///
 /// - `LogFormat::Syslog` parsing currently supports `RFC3164` and `RFC5424` format Syslogs. See:
+///
+/// Returns a [`LogFormat`] enum describing the detected type.
 pub async fn detect_format(line: &str) -> LogFormat {
     let cri_re =
         Regex::new(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d+Z (stdout|stderror) [FP]").unwrap();
@@ -109,7 +109,7 @@ impl NormalizedLog {
     /// Requires output from [`crate::parser::detect_format`]
     /// indicating a log is `LogFormat::PlainText`.
     ///
-    /// This is intended for use in scenarios where a log was unidentifiable.
+    /// - This is intended for use in scenarios where a log was unidentifiable.
     ///
     /// Returns provided `LogFormat::PlainText` as a `NormalizedLog` struct.
     pub async fn plaintext_parser() -> NormalizedLog {}
@@ -118,7 +118,7 @@ impl NormalizedLog {
     /// Requires output from [`crate::parser::detect_format`]
     /// indicating a log is `LogFormat::Syslog(SyslogVariant)`.
     ///
-    /// Supported Syslog formats: `RFC3164` and `RFC5424`
+    /// - Supported Syslog formats: `RFC3164` and `RFC5424`
     ///
     /// Returns provided `LogFormat::Syslog(SyslogVariant)` as a
     /// `NormalizedLog` struct.
