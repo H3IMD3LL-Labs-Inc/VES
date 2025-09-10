@@ -44,12 +44,12 @@ enum SyslogVariant {
 ///
 /// Returns a [`LogFormat`] enum describing the detected type.
 ///
-/// `NOTE`: If log format does not match `LogFormat::CRI`,
+/// - If log format does not match `LogFormat::CRI`,
 /// `LogFormat::DockerJSON`, `LogFormat::ArbitraryJSON` or
 /// `LogFormat::Syslog(SyslogVariant)` detection will default
 /// to `LogFormat::PlainText`
 ///
-/// `LogFormat::Syslog` parsing currently supports `RFC3164` and `RFC5424` format Syslogs. See:
+/// - `LogFormat::Syslog` parsing currently supports `RFC3164` and `RFC5424` format Syslogs. See:
 pub async fn detect_format(line: &str) -> LogFormat {
     let cri_re =
         Regex::new(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d+Z (stdout|stderror) [FP]").unwrap();
@@ -83,30 +83,44 @@ pub async fn detect_format(line: &str) -> LogFormat {
     LogFormat::PlainText
 }
 
-/// Parse a supplied log line using a `NormalizedLog` parser type
-
-/// Parsers for supported log formats to return `NormalizedLog` on a log
 impl NormalizedLog {
-    // CRI Parser
-    pub async fn cri_parser() -> NormalizedLog {
-        // TODO
-    }
+    /// Provides parsing for [`LogFormat::CRI`] logs.
+    /// Requires output from [`crate::parser::detect_format`]
+    /// indicating a log is `LogFormat::CRI` as input.
+    ///
+    /// Returns provided `LogFormat::CRI` as a `NormalizedLog` struct.
+    pub async fn cri_parser(log_format: LogFormat) -> NormalizedLog {}
 
-    // DockerJSON Parser
-    pub async fn docker_parser() -> NormalizedLog {
-        // TODO
-    }
+    /// Provides parsing for [`LogFormat::DockerJSON`] logs.
+    /// Requires output from [`crate::parser::detect_format`]
+    /// indicating a log is `LogFormat::DockerJSON` as input.
+    ///
+    /// Returns provided `LogFormat::DockerJSON` as a `NormalizedLog` struct.
+    pub async fn docker_parser() -> NormalizedLog {}
 
-    // ArbitraryJSON Parser
-    pub async fn arbitrary_json_parser() -> NormalizedLog {
-        // TODO
-    }
+    /// Provides parsing for [`LogFormat::ArbitraryJSON`] logs.
+    /// Requires output from [`crate::parser::detect_format`]
+    /// indicating a log is `LogFormat::ArbitraryJSON` as input
+    ///
+    /// Returns provided `LogFormat::ArbitraryJSON` as a `NormalizedLog` struct.
+    pub async fn arbitrary_json_parser() -> NormalizedLog {}
 
-    // PlainText Parser
-    pub async fn plaintext_parser() -> NormalizedLog {
-        // TODO
-    }
+    /// Provides parsing for [`LogFormat::PlainText`] logs.
+    /// Requires output from [`crate::parser::detect_format`]
+    /// indicating a log is `LogFormat::PlainText`.
+    ///
+    /// This is intended for use in scenarios where a log was unidentifiable.
+    ///
+    /// Returns provided `LogFormat::PlainText` as a `NormalizedLog` struct.
+    pub async fn plaintext_parser() -> NormalizedLog {}
 
-    // Syslog Parser
+    /// Provides parsing for [`LogFormat::Syslog(SyslogVariant)] logs.
+    /// Requires output from [`crate::parser::detect_format`]
+    /// indicating a log is `LogFormat::Syslog(SyslogVariant)`.
+    ///
+    /// Supported Syslog formats: `RFC3164` and `RFC5424`
+    ///
+    /// Returns provided `LogFormat::Syslog(SyslogVariant)` as a
+    /// `NormalizedLog` struct.
     pub async fn syslog_parser() -> NormalizedLog {}
 }
