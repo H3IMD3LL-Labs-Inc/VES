@@ -89,7 +89,30 @@ impl NormalizedLog {
     /// indicating a log is `LogFormat::CRI` as input.
     ///
     /// Returns provided `LogFormat::CRI` as a `NormalizedLog` struct.
-    pub async fn cri_parser(log_format: LogFormat) -> NormalizedLog {}
+    pub async fn cri_parser(line: &str) -> NormalizedLog {
+        //<timestamp> <output stream> <flag> <message>
+
+        let log = detect_format(line);
+
+        let parts: Vec<&str> = line.splitn(4, ' ').collect();
+
+        let timestamp = DateTime::from_str(parts[0]).unwrap_or_else(|_| Utc::now());
+        let stream = parts[1].to_string();
+        let flag = parts[2].to_string();
+        let message = parts[3].to_string();
+        let cri_metadata = Metadata {
+            stream: Some(stream),
+            flag: Some(flag),
+            ..Default::default(),
+        };
+
+        NormalizedLog {
+            timestamp,
+            level: None,
+            message,
+            metadata: Some(Metadata {
+        }
+    }
 
     /// Provides parsing for [`LogFormat::DockerJSON`] logs.
     /// Requires output from [`crate::parser::detect_format`]
