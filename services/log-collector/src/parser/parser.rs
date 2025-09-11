@@ -1,8 +1,7 @@
-use std::str::FromStr;
-
 use chrono::{DateTime, Utc};
 use regex::{Regex, Result};
 use serde::{Deserialize, Serialize};
+use std::str::FromStr;
 
 /// Define normalized log output
 #[derive(Debug)]
