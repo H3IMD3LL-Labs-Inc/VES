@@ -1,27 +1,28 @@
+use std::str::FromStr;
+
+use chrono::{DateTime, Utc};
 use regex::{Regex, Result};
 use serde::{Deserialize, Serialize};
 
 /// Define normalized log output
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug)]
 struct NormalizedLog {
-    timestamp: String,
-    level: String,
+    timestamp: DateTime<Utc>,
+    level: Option<String>,
     message: String,
-    metadata: Metadata,
+    metadata: Option<Metadata>,
     raw_line: String,
 }
 
 /// Define Metadata fields to add using `Metadata Enricher`
 #[derive(Debug, Serialize, Deserialize)]
 struct Metadata {
-    service: String,
-    container: String,
-    process: String,
     stream: String,
-    host: String,
+    flag: String,
 }
 
 /// Define parser supported log formats
+#[derive(Debug)]
 enum LogFormat {
     CRI,
     DockerJSON,
@@ -31,6 +32,7 @@ enum LogFormat {
 }
 
 /// Define supported Syslogs
+#[derive(Debug)]
 enum SyslogVariant {
     RFC3164,
     RFC5424,
@@ -50,7 +52,7 @@ enum SyslogVariant {
 /// - `LogFormat::Syslog` parsing currently supports `RFC3164` and `RFC5424` format Syslogs. See:
 ///
 /// Returns a [`LogFormat`] enum describing the detected type.
-pub async fn detect_format(line: &str) -> LogFormat {
+async fn detect_format(line: &str) -> LogFormat {
     let cri_re =
         Regex::new(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d+Z (stdout|stderror) [FP]").unwrap();
     if cri_re.is_match(line) {
@@ -88,29 +90,41 @@ impl NormalizedLog {
     /// Requires output from [`crate::parser::detect_format`]
     /// indicating a log is `LogFormat::CRI` as input.
     ///
+    /// - Currently does not support other Metadata types
+    /// except `output stream` and `flag`.
+    ///
     /// Returns provided `LogFormat::CRI` as a `NormalizedLog` struct.
-    pub async fn cri_parser(line: &str) -> NormalizedLog {
-        //<timestamp> <output stream> <flag> <message>
+    pub async fn cri_parser(line: &str) -> Result<NormalizedLog, String> {
+        match detect_format(line).await {
+            LogFormat::CRI => {
+                let parts: Vec<&str> = line.splitn(4, ' ').collect();
 
-        let log = detect_format(line);
+                if parts.len() < 4 {
+                    Err(eprintln!(
+                        "Attempted parsing for log {} failed. Log {} is not CRI format!",
+                        line, line
+                    ));
+                }
 
-        let parts: Vec<&str> = line.splitn(4, ' ').collect();
+                let timestamp = DateTime::from_str(parts[0]).unwrap_or_else(|_| Utc::now());
+                let stream = parts[1].to_string();
+                let flag = parts[2].to_string();
+                let message = parts[3].to_string();
 
-        let timestamp = DateTime::from_str(parts[0]).unwrap_or_else(|_| Utc::now());
-        let stream = parts[1].to_string();
-        let flag = parts[2].to_string();
-        let message = parts[3].to_string();
-        let cri_metadata = Metadata {
-            stream: Some(stream),
-            flag: Some(flag),
-            ..Default::default(),
-        };
-
-        NormalizedLog {
-            timestamp,
-            level: None,
-            message,
-            metadata: Some(Metadata {
+                NormalizedLog {
+                    timestamp,
+                    level: None,
+                    message,
+                    metadata: Some(Metadata { stream, flag }),
+                    raw_line: line.to_string(),
+                }
+            }
+            other => {
+                return Err(format!(
+                    "Unexpected log format, not Kubernetes CRI: {:?}",
+                    other
+                ));
+            }
         }
     }
 
