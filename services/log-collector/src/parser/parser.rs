@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 use std::str::FromStr;
 
 /// Define normalized log output
-#[derive(Debug)]
+#[derive(Debug, Deserialize)]
 struct NormalizedLog {
     timestamp: DateTime<Utc>,
     level: Option<String>,
@@ -18,6 +18,14 @@ struct NormalizedLog {
 struct Metadata {
     stream: String,
     flag: String,
+}
+
+/// Helper DockerJSONLog struct to deserialized Docker JSON logs
+#[derive(Debug, Deserialize)]
+struct DockerLog {
+    log: String,
+    stream: String,
+    time: String,
 }
 
 /// Define parser supported log formats
@@ -92,6 +100,8 @@ impl NormalizedLog {
     /// - Currently does not support other Metadata types
     /// except `output stream` and `flag`.
     ///
+    /// - Supported CRI log format: `2023-10-06T00:17:09.669794202Z stdout F Your log message here`
+    ///
     /// Returns provided `LogFormat::CRI` as a `NormalizedLog` struct.
     pub async fn cri_parser(line: &str) -> Result<NormalizedLog, String> {
         match detect_format(line).await {
@@ -131,8 +141,35 @@ impl NormalizedLog {
     /// Requires output from [`crate::parser::detect_format`]
     /// indicating a log is `LogFormat::DockerJSON` as input.
     ///
+    /// - Supported log format for Docker Logs: `{"log": "this is a log message\n", "stream": "stdout", "time": "2023-03-22T08:54:39.123456789Z"}`
+    ///
     /// Returns provided `LogFormat::DockerJSON` as a `NormalizedLog` struct.
-    pub async fn docker_parser() -> NormalizedLog {}
+    pub async fn docker_json_parser(line: &str) -> Result<NormalizedLog, String> {
+        match detect_format(line).await {
+            LogFormat::DockerJSON => {
+                let parsed: DockerLog = serde_json::from_str(line)
+                    .map_err(|e| format!("Failed to parse Docker JSON log: {}", e))?;
+
+                let timestamp = DateTime::from_str(&parsed.time).unwrap_or_else(|_| Utc::now());
+                let stream = parsed.stream;
+                let message = parsed.log.trim_end().to_string();
+
+                let normalized = NormalizedLog {
+                    timestamp,
+                    level: None,
+                    message,
+                    metadata: Some(Metadata { stream, flag: None }),
+                    raw_line: line.to_string(),
+                };
+            }
+            other => {
+                return Err(format!(
+                    "Unexpected log format, not Docker-JSON file: {:?}",
+                    other
+                ));
+            }
+        }
+    }
 
     /// Provides parsing for [`LogFormat::ArbitraryJSON`] logs.
     /// Requires output from [`crate::parser::detect_format`]
