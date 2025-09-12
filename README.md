@@ -149,7 +149,7 @@ This project is licensed under the [Business Source License 1.1](./LICENSE).
 
 - [ ] v0.0.1 - MVP: log-collector, embedding-service, API-Service, Web UI
     - Log Collector
-      ![25%](https://progress-bar.xyz/25/?style=minimal-matte)
+      ![50%](https://progress-bar.xyz/25/?style=minimal-matte)
     - Embedding Service
       ![0%](https://progress-bar.xyz/0/?style=minimal-matte)
     - API Service
