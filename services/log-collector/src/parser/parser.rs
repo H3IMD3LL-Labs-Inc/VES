@@ -191,9 +191,51 @@ impl NormalizedLog {
     /// Requires output from [`crate::parser::detect_format`]
     /// indicating a log is `LogFormat::Syslog(SyslogVariant)`.
     ///
-    /// - Supported Syslog formats: `RFC3164` and `RFC5424`
+    /// Supported Syslog formats:
+    /// - RFC5424: `<PRI>VERSION TIMESTAMP HOSTNAME APP-NAME/PROCESS-NAME PROCESSID MSGID [STRUCTURED-DATA key-value pairs] MESSAGE`
+    /// - RFC3164: `<PRI>MMM DD hh:mm:ss HOSTNAME TAG: MESSAGE`
     ///
     /// Returns provided `LogFormat::Syslog(SyslogVariant)` as a
     /// `NormalizedLog` struct.
-    pub async fn syslog_parser() -> NormalizedLog {}
+    pub async fn syslog_parser(line: &str) -> Result<NormalizedLog, String> {
+        match detect_format(line).await {
+            LogFormat::Syslog(SyslogVariant::RFC5424) => {
+                // HEADER vector: <PRI>VERSION TIMESTAMP HOSTNAME APP-NAME PID MSGID
+                // STRUCTURED DATA vector: - or [...]
+                // MESSAGE vector: MESSAGE
+                let parts: Vec<&str> = line.split_whitespace().collect();
+
+                let timestamp = DateTime::from_str(parts[2]).unwrap_or_else(|_| Utc::now());
+                let message = parts[8].to_string();
+
+                NormalizedLog {
+                    timestamp,
+                    level: None,
+                    message,
+                    metadata: None,
+                    raw_line: line.to_string(),
+                }
+            }
+            LogFormat::Syslog(SyslogVariant::RFC3164) => {
+                let parts: Vec<&str> = line.splitn(5, ' ').collect();
+
+                let timestamp = DateTime::from_str(parts[1]).unwrap_or_else(|_| Utc::now());
+                let message = parts[4].to_string();
+
+                NormalizedLog {
+                    timestamp,
+                    level: None,
+                    message,
+                    metadata: None,
+                    raw_line: line.to_string(),
+                }
+            }
+            other => {
+                return Err(format!(
+                    "Unexpected log format, not Syslog RFC5424 or RFC3164: {:?}",
+                    other
+                ));
+            }
+        }
+    }
 }
