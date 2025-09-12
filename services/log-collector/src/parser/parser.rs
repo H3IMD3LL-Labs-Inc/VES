@@ -35,6 +35,7 @@ enum LogFormat {
     DockerJSON,
     ArbitraryJSON,
     Syslog(SyslogVariant),
+    Unknown,
 }
 
 /// Define supported Syslogs
@@ -88,6 +89,8 @@ async fn detect_format(line: &str) -> LogFormat {
     if syslog_5424_re.is_match(line) {
         return LogFormat::Syslog(SyslogVariant::RFC5424);
     }
+
+    LogFormat::Unknown
 }
 
 impl NormalizedLog {
@@ -178,6 +181,7 @@ impl NormalizedLog {
     ///
     /// - We recommend using a json format similar to the following
     ///  when working with [`crate::parser::NormalizedLog::arbitrary_json_parser()`]:
+    ///
     /// ```json
     /// {
     ///     "time": "2025-09-12T16:34:00Z",
