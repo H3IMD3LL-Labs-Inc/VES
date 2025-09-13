@@ -1,11 +1,10 @@
-use std::str::FromStr;
-
 use chrono::{DateTime, Utc};
 use regex::{Regex, Result};
 use serde::{Deserialize, Serialize};
+use std::str::FromStr;
 
 /// Define normalized log output
-#[derive(Debug)]
+#[derive(Debug, Deserialize)]
 struct NormalizedLog {
     timestamp: DateTime<Utc>,
     level: Option<String>,
@@ -18,7 +17,15 @@ struct NormalizedLog {
 #[derive(Debug, Serialize, Deserialize)]
 struct Metadata {
     stream: String,
-    flag: String,
+    flag: Option<String>,
+}
+
+/// Helper DockerJSONLog struct to deserialized Docker JSON logs
+#[derive(Debug, Deserialize)]
+struct DockerLog {
+    log: String,
+    stream: String,
+    time: String,
 }
 
 /// Define parser supported log formats
@@ -27,8 +34,8 @@ enum LogFormat {
     CRI,
     DockerJSON,
     ArbitraryJSON,
-    PlainText,
     Syslog(SyslogVariant),
+    Unknown,
 }
 
 /// Define supported Syslogs
@@ -78,11 +85,12 @@ async fn detect_format(line: &str) -> LogFormat {
     if syslog_3164_re.is_match(line) {
         return LogFormat::Syslog(SyslogVariant::RFC3164);
     }
+
     if syslog_5424_re.is_match(line) {
         return LogFormat::Syslog(SyslogVariant::RFC5424);
     }
 
-    LogFormat::PlainText
+    LogFormat::Unknown
 }
 
 impl NormalizedLog {
@@ -92,6 +100,8 @@ impl NormalizedLog {
     ///
     /// - Currently does not support other Metadata types
     /// except `output stream` and `flag`.
+    ///
+    /// - Supported CRI log format: `2023-10-06T00:17:09.669794202Z stdout F Your log message here`
     ///
     /// Returns provided `LogFormat::CRI` as a `NormalizedLog` struct.
     pub async fn cri_parser(line: &str) -> Result<NormalizedLog, String> {
@@ -108,7 +118,7 @@ impl NormalizedLog {
 
                 let timestamp = DateTime::from_str(parts[0]).unwrap_or_else(|_| Utc::now());
                 let stream = parts[1].to_string();
-                let flag = parts[2].to_string();
+                let flag = Some(parts[2].to_string());
                 let message = parts[3].to_string();
 
                 NormalizedLog {
@@ -132,32 +142,127 @@ impl NormalizedLog {
     /// Requires output from [`crate::parser::detect_format`]
     /// indicating a log is `LogFormat::DockerJSON` as input.
     ///
+    /// - Supported log format for Docker Logs: `{"log": "this is a log message\n", "stream": "stdout", "time": "2023-03-22T08:54:39.123456789Z"}`
+    ///
     /// Returns provided `LogFormat::DockerJSON` as a `NormalizedLog` struct.
-    pub async fn docker_parser() -> NormalizedLog {}
+    pub async fn docker_json_parser(line: &str) -> Result<NormalizedLog, String> {
+        match detect_format(line).await {
+            LogFormat::DockerJSON => {
+                let parsed: DockerLog = serde_json::from_str(line)
+                    .map_err(|e| format!("Failed to parse Docker JSON log: {}", e))?;
+
+                let timestamp = DateTime::from_str(&parsed.time).unwrap_or_else(|_| Utc::now());
+                let stream = parsed.stream;
+                let message = parsed.log.trim_end().to_string();
+
+                let normalized = NormalizedLog {
+                    timestamp,
+                    level: None,
+                    message,
+                    metadata: Some(Metadata { stream, flag: None }),
+                    raw_line: line.to_string(),
+                };
+            }
+            other => {
+                return Err(format!(
+                    "Unexpected log format, not Docker-JSON file: {:?}",
+                    other
+                ));
+            }
+        }
+    }
 
     /// Provides parsing for [`LogFormat::ArbitraryJSON`] logs.
     /// Requires output from [`crate::parser::detect_format`]
     /// indicating a log is `LogFormat::ArbitraryJSON` as input
     ///
+    /// - [`LogFormat::ArbitraryJSON`] logs are intended to allow
+    /// shipping a custom valid JSON object for your log schema.
+    ///
+    /// - We recommend using a json format similar to the following
+    ///  when working with [`crate::parser::NormalizedLog::arbitrary_json_parser()`]:
+    ///
+    /// ```json
+    /// {
+    ///     "time": "2025-09-12T16:34:00Z",
+    ///     "level": "INFO",
+    ///     "msg": "User logged in"
+    /// }
+    /// ```
+    ///
     /// Returns provided `LogFormat::ArbitraryJSON` as a `NormalizedLog` struct.
-    pub async fn arbitrary_json_parser() -> NormalizedLog {}
+    pub async fn arbitrary_json_parser(line: &str) -> Result<NormalizedLog, String> {
+        match detect_format(line).await {
+            LogFormat::ArbitraryJSON => {
+                let parts: Vec<&str> = line.splitn(4, ' ').collect();
 
-    /// Provides parsing for [`LogFormat::PlainText`] logs.
-    /// Requires output from [`crate::parser::detect_format`]
-    /// indicating a log is `LogFormat::PlainText`.
-    ///
-    /// - This is intended for use in scenarios where a log was unidentifiable.
-    ///
-    /// Returns provided `LogFormat::PlainText` as a `NormalizedLog` struct.
-    pub async fn plaintext_parser() -> NormalizedLog {}
+                let timestamp = DateTime::from_str(parts[0]).unwrap_or_else(|_| Utc::now());
+                let level = Some(parts[1].to_string());
+                let message = parts[2].to_string();
+
+                NormalizedLog {
+                    timestamp,
+                    level,
+                    message,
+                    metadata: None,
+                    raw_line: line.to_string(),
+                }
+            }
+            other => {
+                return Err(eprintln!(
+                    "Unexpected log format, not ArbitraryJSON: {:?}",
+                    other
+                ));
+            }
+        }
+    }
 
     /// Provides parsing for [`LogFormat::Syslog(SyslogVariant)] logs.
     /// Requires output from [`crate::parser::detect_format`]
     /// indicating a log is `LogFormat::Syslog(SyslogVariant)`.
     ///
-    /// - Supported Syslog formats: `RFC3164` and `RFC5424`
+    /// Supported Syslog formats:
+    /// - RFC5424: `<PRI>VERSION TIMESTAMP HOSTNAME APP-NAME/PROCESS-NAME PROCESSID MSGID [STRUCTURED-DATA key-value pairs] MESSAGE`
+    /// - RFC3164: `<PRI>MMM DD hh:mm:ss HOSTNAME TAG: MESSAGE`
     ///
     /// Returns provided `LogFormat::Syslog(SyslogVariant)` as a
     /// `NormalizedLog` struct.
-    pub async fn syslog_parser() -> NormalizedLog {}
+    pub async fn syslog_parser(line: &str) -> Result<NormalizedLog, String> {
+        match detect_format(line).await {
+            LogFormat::Syslog(SyslogVariant::RFC5424) => {
+                let parts: Vec<&str> = line.split_whitespace().collect();
+
+                let timestamp = DateTime::from_str(parts[2]).unwrap_or_else(|_| Utc::now());
+                let message = parts[8].to_string();
+
+                NormalizedLog {
+                    timestamp,
+                    level: None,
+                    message,
+                    metadata: None,
+                    raw_line: line.to_string(),
+                }
+            }
+            LogFormat::Syslog(SyslogVariant::RFC3164) => {
+                let parts: Vec<&str> = line.splitn(5, ' ').collect();
+
+                let timestamp = DateTime::from_str(parts[1]).unwrap_or_else(|_| Utc::now());
+                let message = parts[4].to_string();
+
+                NormalizedLog {
+                    timestamp,
+                    level: None,
+                    message,
+                    metadata: None,
+                    raw_line: line.to_string(),
+                }
+            }
+            other => {
+                return Err(format!(
+                    "Unexpected log format, not Syslog RFC5424 or RFC3164: {:?}",
+                    other
+                ));
+            }
+        }
+    }
 }
