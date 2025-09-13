@@ -17,7 +17,7 @@ struct NormalizedLog {
 #[derive(Debug, Serialize, Deserialize)]
 struct Metadata {
     stream: String,
-    flag: String,
+    flag: Option<String>,
 }
 
 /// Helper DockerJSONLog struct to deserialized Docker JSON logs
