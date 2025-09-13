@@ -118,7 +118,7 @@ impl NormalizedLog {
 
                 let timestamp = DateTime::from_str(parts[0]).unwrap_or_else(|_| Utc::now());
                 let stream = parts[1].to_string();
-                let flag = parts[2].to_string();
+                let flag = Some(parts[2].to_string());
                 let message = parts[3].to_string();
 
                 NormalizedLog {
@@ -197,7 +197,7 @@ impl NormalizedLog {
                 let parts: Vec<&str> = line.splitn(4, ' ').collect();
 
                 let timestamp = DateTime::from_str(parts[0]).unwrap_or_else(|_| Utc::now());
-                let level = parts[1].to_string();
+                let level = Some(parts[1].to_string());
                 let message = parts[2].to_string();
 
                 NormalizedLog {
