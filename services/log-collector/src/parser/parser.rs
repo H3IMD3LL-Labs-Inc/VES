@@ -5,7 +5,7 @@ use std::str::FromStr;
 
 /// Define normalized log output
 #[derive(Debug, Deserialize)]
-struct NormalizedLog {
+pub struct NormalizedLog {
     timestamp: DateTime<Utc>,
     level: Option<String>,
     message: String,
