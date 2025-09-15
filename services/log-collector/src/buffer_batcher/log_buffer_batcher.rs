@@ -19,6 +19,7 @@
 //
 
 use crate::parser::parser::NormalizedLog;
+use rusqlite::{Connection, Result, params};
 use serde::Deserialize;
 use std::collections::VecDeque;
 use tokio::fs;
@@ -32,27 +33,40 @@ struct Config {
 /// Buffer configuration
 #[derive(Debug, Deserialize)]
 struct BufferConfig {
-    buffer: InMemoryBuffer,
+    capacity_option: String,
     buffer_capacity: u64,
     batch_size: usize,
     batch_timeout_ms: u64,
-    durability: String,
-    sqlite_path: Option<String>,
+    durability: DurabilityConfig,
     overflow_policy: String,
     drain_policy: String,
 }
 
-/// In-Memory Buffer
-#[derive(Debug, Deserialize)]
+/// In-Memory Buffer (runtime structure)
+#[derive(Debug)]
 struct InMemoryBuffer {
     queue: VecDeque<NormalizedLog>,
     buffer_capacity: u64,
     batch_size: usize,
     batch_timeout_ms: u64,
-    durability: String,
-    sqlite_path: Option<String>,
+    durability: Durability,
     overflow_policy: String,
     drain_policy: String,
+}
+
+/// Configuration-only durability
+#[derive(Debug, Deserialize, Clone)]
+#[serde(rename_all = "kebab-case")]
+pub enum DurabilityConfig {
+    InMemory,
+    SQLite(String),
+}
+
+/// Runtime durability (contains real durability resources used by InMemoryBuffer)
+#[derive(Debug)]
+pub enum Durability {
+    InMemory,
+    SQLite(Connection),
 }
 
 /// Methods implementing Buffer
@@ -64,29 +78,45 @@ impl InMemoryBuffer {
     }
 
     pub async fn new(buffer_config: &BufferConfig) -> Self {
-        let queue = VecDeque::new();
-
-        if buffer_config.durability == "sqlite" {
-            if let Some(path) = &buffer_config.sqlite_path {
-                println!("Opening SQLite supported buffer at {}", path);
-
-                // TODO: Create SQLite instance for the new buffer persistence
-            } else {
-                panic!("Durability is set to 'sqlite' but no sqlite_path provided!");
+        let queue = match buffer_config.capacity_option.as_str() {
+            "bounded" => {
+                println!(
+                    "Creating bounded buffer with capacity {}",
+                    buffer_config.buffer_capacity
+                );
+                VecDeque::with_capacity(buffer_config.buffer_capacity as usize)
             }
-        } else {
-            println!("Using in-memory buffer (no persistence)");
-        }
+            "unbounded" => {
+                println!("Creating unbounded buffer");
+                VecDeque::new()
+            }
+            other => {
+                panic!("{} is not a valid buffer capacity_option", other);
+            }
+        };
 
-        // Check capacity(bounded or unbounded), overflow policy, drain policy
+        let durability = match &buffer_config.durability {
+            DurabilityConfig::InMemory => {
+                println!(
+                    "Using in-memory buffer (no persistence support). \
+                    We do not recommend running in this configuration in production deployments."
+                );
+                Durability::InMemory
+            }
+            DurabilityConfig::SQLite(path) => {
+                println!("Creating persistent buffer with SQLite support at {}", path);
+                let conn = Connection::open(path)
+                    .unwrap_or_else(|e| panic!("Failed to open SQLite DB {}: {}", path, e));
+                Durability::SQLite(conn)
+            }
+        };
 
         InMemoryBuffer {
             queue,
             buffer_capacity: buffer_config.buffer_capacity,
             batch_size: buffer_config.batch_size,
             batch_timeout_ms: buffer_config.batch_timeout_ms,
-            durability: buffer_config.durability.clone(),
-            sqlite_path: buffer_config.sqlite_path.clone(),
+            durability,
             overflow_policy: buffer_config.overflow_policy.clone(),
             drain_policy: buffer_config.drain_policy.clone(),
         }
@@ -98,5 +128,3 @@ impl InMemoryBuffer {
         // Manage async code, should I use RwLocks-Mutexes-Atomic operations or simple tokio::sync::mspc?
     }
 }
-
-//
