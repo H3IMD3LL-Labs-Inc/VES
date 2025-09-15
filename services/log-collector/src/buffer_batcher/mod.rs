@@ -1,1 +1,1 @@
-pub mod buffer_batcher;
+pub mod log_buffer_batcher;
