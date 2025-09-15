@@ -23,6 +23,7 @@ use rusqlite::{Connection, Result, params};
 use serde::Deserialize;
 use std::collections::VecDeque;
 use tokio::fs;
+use tokio::task;
 
 /// Configuration
 #[derive(Debug, Deserialize)]
@@ -107,6 +108,19 @@ impl InMemoryBuffer {
                 println!("Creating persistent buffer with SQLite support at {}", path);
                 let conn = Connection::open(path)
                     .unwrap_or_else(|e| panic!("Failed to open SQLite DB {}: {}", path, e));
+
+                conn.execute(
+                    "CREATE TABLE IF NOT EXISTS normalized_logs (
+                        id              INTEGER PRIMARY KEY AUTOINCREMENT,
+                        timestamp       TEXT NOT NULL,
+                        level           TEXT,
+                        message         TEXT NOT NULL,
+                        metadata        TEXT,
+                        raw_line        TEXT NOT NULL
+                    )",
+                    (),
+                ).expect("Failed to create normalized_logs table in SQLite");
+
                 Durability::SQLite(conn)
             }
         };
@@ -122,9 +136,64 @@ impl InMemoryBuffer {
         }
     }
 
-    pub async fn add_normalized_log(&mut self, log: NormalizedLog) {
-        // Check if log being added is NormalizedLog
-        // Check durability, capacity, overflow policy and drain policy configuration
-        // Manage async code, should I use RwLocks-Mutexes-Atomic operations or simple tokio::sync::mspc?
+    /// Check InMemoryBuffer's capacity. This is required to determine
+    /// actions in push(), drain(), flush() methods.
+    pub fn check_buffer_capacity(&self) -> usize {
+        let used_capacity = self.queue.len();
+
+        if self.buffer_capacity == 0 {
+            usize::MAX
+        } else {
+            self.buffer_capacity as usize - used_capacity
+        }
     }
+
+    /// Push NormalizedLogs into an InMemoryBuffer
+        // If buffer is bounded and full -> enforce overflow_policy
+
+        // IMPLEMENTATION
+        // Goal: Combine fast in-memory writes + durable SQLite persistence while minimizing data loss.
+            // 1. In-memory queue: every log is pushed here immediately -> very fast
+            // 2. Async batch flush: periodically take logs from memory -> insert into SQLite -> improve throughput.
+            // 3. Durability safety: prevent data loss if process crashes before batch flush;
+                    // - WAL
+                    // - Sync flush on shutdown/critical events
+                    // - Configurable durability mode (WAL and Sync flush on shutdown/critical events)
+    pub async fn push(log: NormalizedLog) -> Result<()> {
+        // add log to in-memory buffer
+        // add log to persistance (SQLite)
+        // Confirm success/failure
+    }
+
+    /// Asynchronously flush batch to SQLite if persistence is enabled,
+    /// while clearing the InMemoryBuffer (handle with care).
+    ///
+    /// This does not clear logs from InMemoryBuffer after they are persisted
+    /// to SQLite
+    ///
+    /// This maintains efficiency, and reduces transaction overhead, improving throughput.
+    pub async fn flush() -> Result<()> {
+
+    }
+
+    /// Asynchronously drain batch, removing logs from in-memory queue after
+    /// successful and confirmed consumption.
+    ///
+    /// Use the set `drain_policy` to determine how to drain the batch
+    pub async fn drain() -> Result<()> {
+
+    }
+
+
+    /// Clear Buffer, remove in-memory queue, simultaneously clearing the persisted
+    /// buffer from SQLite.
+
+
+
+    // Peek / Inspect without removing
+    // Check buffer state
+    // Background task: Flush / Clear buffer
+    // Overflow handling with overflow_policy
+    // Async batch draining with drain_policy
+    // Durability init
 }
