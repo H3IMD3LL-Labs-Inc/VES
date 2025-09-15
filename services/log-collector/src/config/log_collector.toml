@@ -1,11 +1,11 @@
 [buffer]
-capacity_option = "unbounded"               # unbounded or bounded
+capacity_option = "unbounded"
 buffer_capacity = 10000
 batch_size = 200
 batch_timeout_ms = 500
 durability = "in-memory"
 sqlite_path = "parsed_log_buffer.db"
-overflow_policy = "drop_oldest"             #
+overflow_policy = "drop_oldest"
 drain_police = "batch_size_and_timeout"
 
 [watcher]
