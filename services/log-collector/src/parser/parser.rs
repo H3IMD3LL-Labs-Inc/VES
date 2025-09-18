@@ -4,17 +4,17 @@ use serde::{Deserialize, Serialize};
 use std::str::FromStr;
 
 /// Define normalized log output
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Clone)]
 pub struct NormalizedLog {
-    timestamp: DateTime<Utc>,
-    level: Option<String>,
-    message: String,
-    metadata: Option<Metadata>,
-    raw_line: String,
+    pub timestamp: DateTime<Utc>,
+    pub level: Option<String>,
+    pub message: String,
+    pub metadata: Option<Metadata>,
+    pub raw_line: String,
 }
 
 /// Define Metadata fields to add using `Metadata Enricher`
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 struct Metadata {
     stream: String,
     flag: Option<String>,
