@@ -72,7 +72,7 @@ pub enum Durability {
 
 /// Methods implementing Buffer
 impl InMemoryBuffer {
-    pub async fn load_config(path: &str) -> Config {
+    pub async fn load_config(path: &str) -> BufferConfig {
         let buffer_config = std::fs::read_to_string(path).expect("Failed to read config file");
 
         toml::from_str(&buffer_config).expect("Failed to parse config file")
@@ -159,10 +159,41 @@ impl InMemoryBuffer {
                     // - WAL
                     // - Sync flush on shutdown/critical events
                     // - Configurable durability mode (WAL and Sync flush on shutdown/critical events)
-    pub async fn push(log: NormalizedLog) -> Result<()> {
-        // add log to in-memory buffer
-        // add log to persistance (SQLite)
-        // Confirm success/failure
+    pub async fn push(&mut self, log: NormalizedLog) -> Result<()> {
+        match &mut self.durability {
+            /*
+             * In-memory mode
+             */
+             Durability::InMemory => {
+                 if self.buffer_capacity > 0 && self.queue.len() >= self.buffer_capacity as usize {
+                     // Handle overflow based on overflow_policy
+                 }
+                 self.queue.push_back(log);
+             }
+
+             /*
+              * SQLite mode
+              */
+             Durability::SQLite(conn) => {
+                 if self.buffer_capacity > 0 && self.queue.len() >= self.buffer_capacity as usize {
+                     // Handle overflow based on overflow_policy
+                 }
+                 self.queue.push_back(log.clone());
+
+                 conn.execute(
+                     "INSERT INTO normalized_logs (timestamp, level, message, metadata, raw_line) VALUES (?1, ?2, ?3, ?4, ?5)",
+                     params![
+                         log.timestamp.to_rfc3339(),
+                         log.level,
+                         log.message,
+                         log.metadata.as_ref().map(|m| serde_json::to_string(m).unwrap()),
+                         log.raw_line
+                     ],
+                 )?;
+             }
+        }
+
+        Ok(())
     }
 
     /// Asynchronously flush batch to SQLite if persistence is enabled,
