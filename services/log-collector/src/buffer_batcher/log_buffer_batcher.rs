@@ -22,8 +22,10 @@ use crate::parser::parser::NormalizedLog;
 use rusqlite::{Connection, Result, params};
 use serde::Deserialize;
 use std::collections::VecDeque;
+use std::sync::Arc;
 use tokio::fs;
 use tokio::task;
+use tokio::sync::Notify;
 
 /// Configuration
 #[derive(Debug, Deserialize)]
@@ -53,6 +55,7 @@ struct InMemoryBuffer {
     durability: Durability,
     overflow_policy: String,
     drain_policy: String,
+    notify: Arc<Notify>,
 }
 
 /// Configuration-only durability
@@ -119,7 +122,8 @@ impl InMemoryBuffer {
                         raw_line        TEXT NOT NULL
                     )",
                     (),
-                ).expect("Failed to create normalized_logs table in SQLite");
+                )
+                .expect("Failed to create normalized_logs table in SQLite");
 
                 Durability::SQLite(conn)
             }
@@ -149,38 +153,38 @@ impl InMemoryBuffer {
     }
 
     /// Push NormalizedLogs into an InMemoryBuffer
-        // If buffer is bounded and full -> enforce overflow_policy
+    // If buffer is bounded and full -> enforce overflow_policy
 
-        // IMPLEMENTATION
-        // Goal: Combine fast in-memory writes + durable SQLite persistence while minimizing data loss.
-            // 1. In-memory queue: every log is pushed here immediately -> very fast
-            // 2. Async batch flush: periodically take logs from memory -> insert into SQLite -> improve throughput.
-            // 3. Durability safety: prevent data loss if process crashes before batch flush;
-                    // - WAL
-                    // - Sync flush on shutdown/critical events
-                    // - Configurable durability mode (WAL and Sync flush on shutdown/critical events)
+    // IMPLEMENTATION
+    // Goal: Combine fast in-memory writes + durable SQLite persistence while minimizing data loss.
+    // 1. In-memory queue: every log is pushed here immediately -> very fast
+    // 2. Async batch flush: periodically take logs from memory -> insert into SQLite -> improve throughput.
+    // 3. Durability safety: prevent data loss if process crashes before batch flush;
+    // - WAL
+    // - Sync flush on shutdown/critical events
+    // - Configurable durability mode (WAL and Sync flush on shutdown/critical events)
     pub async fn push(&mut self, log: NormalizedLog) -> Result<()> {
         match &mut self.durability {
             /*
              * In-memory mode
              */
-             Durability::InMemory => {
-                 if self.buffer_capacity > 0 && self.queue.len() >= self.buffer_capacity as usize {
-                     // Handle overflow based on overflow_policy
-                 }
-                 self.queue.push_back(log);
-             }
+            Durability::InMemory => {
+                if self.buffer_capacity > 0 && self.queue.len() >= self.buffer_capacity as usize {
+                    // Handle overflow based on overflow_policy
+                }
+                self.queue.push_back(log);
+            }
 
-             /*
-              * SQLite mode
-              */
-             Durability::SQLite(conn) => {
-                 if self.buffer_capacity > 0 && self.queue.len() >= self.buffer_capacity as usize {
-                     // Handle overflow based on overflow_policy
-                 }
-                 self.queue.push_back(log.clone());
+            /*
+             * SQLite mode
+             */
+            Durability::SQLite(conn) => {
+                if self.buffer_capacity > 0 && self.queue.len() >= self.buffer_capacity as usize {
+                    // Handle overflow based on overflow_policy
+                }
+                self.queue.push_back(log.clone());
 
-                 conn.execute(
+                conn.execute(
                      "INSERT INTO normalized_logs (timestamp, level, message, metadata, raw_line) VALUES (?1, ?2, ?3, ?4, ?5)",
                      params![
                          log.timestamp.to_rfc3339(),
@@ -190,7 +194,7 @@ impl InMemoryBuffer {
                          log.raw_line
                      ],
                  )?;
-             }
+            }
         }
 
         Ok(())
@@ -203,28 +207,57 @@ impl InMemoryBuffer {
     /// to SQLite
     ///
     /// This maintains efficiency, and reduces transaction overhead, improving throughput.
-    pub async fn flush() -> Result<()> {
-
-    }
+    pub async fn flush() -> Result<()> {}
 
     /// Asynchronously drain batch, removing logs from in-memory queue after
     /// successful and confirmed consumption.
     ///
     /// Use the set `drain_policy` to determine how to drain the batch
-    pub async fn drain() -> Result<()> {
+    pub async fn drain() -> Result<()> {}
 
+    /// Handle InMemoryBuffer overflow using the overflow_policy
+    /// set in log_collector.toml by user.
+    async fn handle_overflow(&mut self) -> Result<bool> {
+        match self.overflow_policy.as_str() {
+            "drop_newest" => {
+                // When buffer is full, reject incoming log.
+                // Preserve all older logs and silently discard
+                // newest one
+                eprintln!("Buffer full: droppint newest incoming log");
+                Ok(false)
+            }
+            "drop_oldest" => {
+                // When buffer is full, evict the oldest log to
+                // make room. Always accept the newest log, oldest
+                // history is discarded first
+                self.queue.pop_front();
+                Ok(true)
+            }
+            "block_with_backpressure" => {
+                // When buffer is full, producer must wait until
+                // there's space. No log is dropped, but log
+                // ingestion slows down.
+                while self.queue.len() >= self.buffer_capacity as usize {
+                    self.notify.notified().await;
+                }
+                Ok(false)
+            }
+            "grow_capacity" => {
+                // When buffer is full, increase its capacity dynamically
+                // No log is ever dropped or blocked, buffer grows as needed.
+                // Prevent producers from oupacing consumers, to prevent OOM
+                // (out-of-memory).
+                self.queue.reserve(1);
+                eprintln!("buffer_capacity exceeded, capacity extended without memory re-allocation")
+                Ok(true)
+            }
+            other => {
+                eprintln!(
+                    "No overflow_policy configured, {} is not a configuration option",
+                    other
+                );
+                Ok(false)
+            }
+        }
     }
-
-
-    /// Clear Buffer, remove in-memory queue, simultaneously clearing the persisted
-    /// buffer from SQLite.
-
-
-
-    // Peek / Inspect without removing
-    // Check buffer state
-    // Background task: Flush / Clear buffer
-    // Overflow handling with overflow_policy
-    // Async batch draining with drain_policy
-    // Durability init
 }
