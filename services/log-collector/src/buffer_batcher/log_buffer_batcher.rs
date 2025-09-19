@@ -164,14 +164,15 @@ impl InMemoryBuffer {
     // - Sync flush on shutdown/critical events
     // - Configurable durability mode (WAL and Sync flush on shutdown/critical events)
     pub async fn push(&mut self, log: NormalizedLog) -> Result<()> {
+        if self.buffer_capacity > 0 && self.queue.len() >= self.buffer_capacity as usize {
+            self.handle_overflow();
+        }
+
         match &mut self.durability {
             /*
              * In-memory mode
              */
             Durability::InMemory => {
-                if self.buffer_capacity > 0 && self.queue.len() >= self.buffer_capacity as usize {
-                    // Handle overflow based on overflow_policy
-                }
                 self.queue.push_back(log);
             }
 
@@ -179,9 +180,6 @@ impl InMemoryBuffer {
              * SQLite mode
              */
             Durability::SQLite(conn) => {
-                if self.buffer_capacity > 0 && self.queue.len() >= self.buffer_capacity as usize {
-                    // Handle overflow based on overflow_policy
-                }
                 self.queue.push_back(log.clone());
 
                 conn.execute(
@@ -221,9 +219,9 @@ impl InMemoryBuffer {
         match self.overflow_policy.as_str() {
             "drop_newest" => {
                 // When buffer is full, reject incoming log.
-                // Preserve all older logs and silently discard
+                // Preserve all older logs and silently discard/ignore
                 // newest one
-                eprintln!("Buffer full: droppint newest incoming log");
+                eprintln!("Buffer full: dropping newest incoming log");
                 Ok(false)
             }
             "drop_oldest" => {
