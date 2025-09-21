@@ -21,8 +21,10 @@
 use crate::parser::parser::NormalizedLog;
 use rusqlite::{Connection, Result, params};
 use serde::Deserialize;
+use tokio::time::Instant;
 use std::collections::VecDeque;
 use std::sync::Arc;
+use std::time::Duration;
 use tokio::fs;
 use tokio::task;
 use tokio::sync::Notify;
@@ -43,6 +45,7 @@ struct BufferConfig {
     durability: DurabilityConfig,
     overflow_policy: String,
     drain_policy: String,
+    flush_policy: String,
 }
 
 /// In-Memory Buffer (runtime structure)
@@ -52,10 +55,11 @@ struct InMemoryBuffer {
     buffer_capacity: u64,
     batch_size: usize,
     batch_timeout_ms: u64,
+    last_flush_at: Instant,
     durability: Durability,
     overflow_policy: String,
     drain_policy: String,
-    notify: Arc<Notify>,
+    flush_policy: String,
 }
 
 /// Configuration-only durability
@@ -134,9 +138,11 @@ impl InMemoryBuffer {
             buffer_capacity: buffer_config.buffer_capacity,
             batch_size: buffer_config.batch_size,
             batch_timeout_ms: buffer_config.batch_timeout_ms,
+            last_flush_at: Instant::now(),
             durability,
             overflow_policy: buffer_config.overflow_policy.clone(),
             drain_policy: buffer_config.drain_policy.clone(),
+            flush_policy: buffer_config.flush_policy.clone(),
         }
     }
 
@@ -182,6 +188,7 @@ impl InMemoryBuffer {
             Durability::SQLite(conn) => {
                 self.queue.push_back(log.clone());
 
+                // TODO: Replace with flush() to improve efficiency of this operation
                 conn.execute(
                      "INSERT INTO normalized_logs (timestamp, level, message, metadata, raw_line) VALUES (?1, ?2, ?3, ?4, ?5)",
                      params![
@@ -205,10 +212,81 @@ impl InMemoryBuffer {
     /// to SQLite
     ///
     /// This maintains efficiency, and reduces transaction overhead, improving throughput.
-    pub async fn flush() -> Result<()> {}
+    pub async fn flush(&mut self, log: NormalizedLog) -> Result<()> {
+        // Read the InMemoryBuffer
+        // Flush a certain number of NormalizedLogs to SQLite
+        // Keep flushed logs on InMemoryBuffer, drain() uses these
+        // Return an indicator to show a flush() occured successfully or failed
+        match self.flush_policy.as_str() {
+            "batch_size" => {
+                if self.queue.len() >= self.batch_size {
+                    match &mut self.durability {
+                        Durability::SQLite(conn) => {
+                            let batch_logs: Vec<NormalizedLog> = self.queue
+                                .iter()
+                                .take(self.batch_size)
+                                .cloned()
+                                .collect();
+
+                            for log in batch_logs {
+                                conn.execute(
+                                    "INSERT INTO normalized_logs (timestamp, level, message, metadata, raw_line) VALUES (?1, ?2, ?3, ?4, ?5)",
+                                    params![
+                                        log.timestamp.to_rfc3339(),
+                                        log.level,
+                                        log.message,
+                                        log.metadata.as_ref().map(|m| serde_json::to_string(m).unwrap()),
+                                        log.raw_line
+                                    ],
+                                )?;
+                            }
+                        }
+                        Durability::InMemory => {
+                            eprintln!("InMemoryBuffer durability configured to `in-memory` logs are currently not flushed to SQLite persistent storage");
+                        }
+                    }
+                }
+
+                Ok(())
+            }
+            "batch_timeout" => {
+                // Trigger based on batch_timeout_ms set in config
+                // and track last_flush_at, to know where to start counting from
+                // to batch_timeout_ms. NOTE last_flush_at starts when a new InMemoryBuffer
+                // is created.
+
+                // Check duration since InMemoryBuffer creation(last_flush_at) incase the buffer is new.
+                // If duration > batch_timeout_ms, then flush (even if batch_size has not been hit yet)
+                if Instant::now().duration_since(self.last_flush_at) > Duration::from_millis(self.batch_timeout_ms) {
+                    match &mut self.durability {
+                        Durability::SQLite(conn) => {
+
+                        }
+                        Durability::InMemory => {
+                            eprintln!("InMemoryBuffer durability configured to `in-memory` logs are currently not flushed to SQLite persistent storage");
+                        }
+                    }
+                }
+
+                Ok(())
+            }
+            "hybrid_size_timeout" => {
+                // Trigger based on batch_size and batch_timeout_ms set,
+                // depending on which comes first
+
+                Ok(())
+            }
+            other => {
+                eprintln!("No flush_policy configured. {} is not a flush_policy option", other);
+                Ok(())
+            }
+        }
+    }
 
     /// Asynchronously drain batch, removing logs from in-memory queue after
-    /// successful and confirmed consumption.
+    /// successful and confirmed consumption by SQLite.
+    ///
+    /// Basically sends NormalizedLogs in batches to Shipper module.
     ///
     /// Use the set `drain_policy` to determine how to drain the batch
     pub async fn drain() -> Result<()> {}
