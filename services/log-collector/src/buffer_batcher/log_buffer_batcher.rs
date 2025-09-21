@@ -188,17 +188,7 @@ impl InMemoryBuffer {
             Durability::SQLite(conn) => {
                 self.queue.push_back(log.clone());
 
-                // TODO: Replace with flush() to improve efficiency of this operation
-                conn.execute(
-                     "INSERT INTO normalized_logs (timestamp, level, message, metadata, raw_line) VALUES (?1, ?2, ?3, ?4, ?5)",
-                     params![
-                         log.timestamp.to_rfc3339(),
-                         log.level,
-                         log.message,
-                         log.metadata.as_ref().map(|m| serde_json::to_string(m).unwrap()),
-                         log.raw_line
-                     ],
-                 )?;
+                self.flush(log.clone());
             }
         }
 
@@ -236,6 +226,10 @@ impl InMemoryBuffer {
                                     ],
                                 )?;
                             }
+                            // TODO: Run `drain()` to clear InMemoryBuffer of already persisted logs
+                            // remember to consider that only the persisted elements should be deleted from InMemoryBuffer
+
+                            self.last_flush_at = Instant::now();
                         }
                         Durability::InMemory => {
                             eprintln!("InMemoryBuffer durability configured to `in-memory` logs are currently not flushed to SQLite persistent storage");
@@ -268,6 +262,7 @@ impl InMemoryBuffer {
                                     ],
                                 )?;
                             }
+                            // TODO: run `drain()` method to clear InMemoryBuffer of successfully persisted logs
 
                             self.last_flush_at = Instant::now();
                         }
@@ -280,8 +275,9 @@ impl InMemoryBuffer {
                 Ok(())
             }
             "hybrid_size_timeout" => {
-                // Trigger based on batch_size and batch_timeout_ms set,
-                // depending on which comes first
+                // Trigger based on which is best-suited to the current scenario.
+                // Define the actual scenarios and which flush method is best based on these
+                // scenarios you have defined. DO NOT ADD MORE USER CONFIGURATION COMPLEXITY.
 
                 Ok(())
             }
