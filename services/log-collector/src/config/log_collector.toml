@@ -1,11 +1,12 @@
 [buffer]
-capacity_option = "unbounded"
+capacity_option = "unbounded"                              # Options: bounded, unbounded
 buffer_capacity = 10000
 batch_size = 200
 batch_timeout_ms = 500
-durability = "in-memory"                    # persistent => { sqlite = "parsed_log_buffer.db" }
-overflow_policy = "drop_oldest"
-drain_police = "batch_size_and_timeout"
+durability = "in-memory"                                    # Options: in-memory, persistent => { sqlite = "parsed_log_buffer.db" }
+overflow_policy = "drop_oldest"                             # Options: drop_oldest, drop_newest, block_with_backpressure, grow_capacity
+flush_policy = "batch_size"                                 # Options: batch_size, batch_timeout, hybrid_size_timeout, on_demand(coming soon)
+drain_policy = "batch_size_and_timeout"                     # Options: batch_size, batch_timeout, batch_size_and_timeout
 
 [watcher]
 
