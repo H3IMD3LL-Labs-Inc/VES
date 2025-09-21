@@ -213,10 +213,6 @@ impl InMemoryBuffer {
     ///
     /// This maintains efficiency, and reduces transaction overhead, improving throughput.
     pub async fn flush(&mut self, log: NormalizedLog) -> Result<()> {
-        // Read the InMemoryBuffer
-        // Flush a certain number of NormalizedLogs to SQLite
-        // Keep flushed logs on InMemoryBuffer, drain() uses these
-        // Return an indicator to show a flush() occured successfully or failed
         match self.flush_policy.as_str() {
             "batch_size" => {
                 if self.queue.len() >= self.batch_size {
@@ -250,17 +246,30 @@ impl InMemoryBuffer {
                 Ok(())
             }
             "batch_timeout" => {
-                // Trigger based on batch_timeout_ms set in config
-                // and track last_flush_at, to know where to start counting from
-                // to batch_timeout_ms. NOTE last_flush_at starts when a new InMemoryBuffer
-                // is created.
-
-                // Check duration since InMemoryBuffer creation(last_flush_at) incase the buffer is new.
-                // If duration > batch_timeout_ms, then flush (even if batch_size has not been hit yet)
                 if Instant::now().duration_since(self.last_flush_at) > Duration::from_millis(self.batch_timeout_ms) {
                     match &mut self.durability {
                         Durability::SQLite(conn) => {
 
+                            let batch_logs: Vec<NormalizedLog> = self.queue
+                                .iter()
+                                .take(self.queue.len())
+                                .cloned()
+                                .collect();
+
+                            for log in batch_logs {
+                                conn.execute(
+                                    "INSERT INTO normalized_logs (timestamp, level, message, metadata, raw_line) VALUES (?1, ?2, ?3, ?4, ?5)",
+                                    params![
+                                        log.timestamp.to_rfc3339(),
+                                        log.level,
+                                        log.message,
+                                        log.metadata.as_ref().map(|m| serde_json::to_string(m).unwrap()),
+                                        log.raw_line,
+                                    ],
+                                )?;
+                            }
+
+                            self.last_flush_at = Instant::now();
                         }
                         Durability::InMemory => {
                             eprintln!("InMemoryBuffer durability configured to `in-memory` logs are currently not flushed to SQLite persistent storage");
