@@ -77,7 +77,6 @@ pub enum Durability {
     SQLite(Connection),
 }
 
-/// Methods implementing Buffer
 impl InMemoryBuffer {
     pub async fn load_config(path: &str) -> BufferConfig {
         let buffer_config = std::fs::read_to_string(path).expect("Failed to read config file");
@@ -85,6 +84,14 @@ impl InMemoryBuffer {
         toml::from_str(&buffer_config).expect("Failed to parse config file")
     }
 
+    /// Create a new `InMemoryBuffer` to store `NormalizedLog`
+    /// produced by the `parser`.
+    ///
+    /// The new buffer is configured at runtime based on user
+    /// configuration set in `log-collector.toml` file.
+    ///
+    /// **Recommended:** For use in production environments, ensure
+    /// buffer durability is set to `persistent => { sqlite = "parsed_log_buffer.db" }`
     pub async fn new(buffer_config: &BufferConfig) -> Self {
         let queue = match buffer_config.capacity_option.as_str() {
             "bounded" => {
@@ -146,8 +153,8 @@ impl InMemoryBuffer {
         }
     }
 
-    /// Check InMemoryBuffer's capacity. This is required to determine
-    /// actions in push(), drain(), flush() methods.
+    /// Check `InMemoryBuffer` capacity, for health/performance checks.
+    /// Currently, this has no implemented use case.
     pub fn check_buffer_capacity(&self) -> usize {
         let used_capacity = self.queue.len();
 
@@ -158,17 +165,10 @@ impl InMemoryBuffer {
         }
     }
 
-    /// Push NormalizedLogs into an InMemoryBuffer
-    // If buffer is bounded and full -> enforce overflow_policy
-
-    // IMPLEMENTATION
-    // Goal: Combine fast in-memory writes + durable SQLite persistence while minimizing data loss.
-    // 1. In-memory queue: every log is pushed here immediately -> very fast
-    // 2. Async batch flush: periodically take logs from memory -> insert into SQLite -> improve throughput.
-    // 3. Durability safety: prevent data loss if process crashes before batch flush;
-    // - WAL
-    // - Sync flush on shutdown/critical events
-    // - Configurable durability mode (WAL and Sync flush on shutdown/critical events)
+    /// Asynchronously push a `NormlizedLog` to an `InMemoryBuffer`.
+    ///
+    /// Logs in the buffer are persisted to SQLite after each `push_back`
+    /// to the buffer.
     pub async fn push(&mut self, log: NormalizedLog) -> Result<()> {
         if self.buffer_capacity > 0 && self.queue.len() >= self.buffer_capacity as usize {
             self.handle_overflow();
@@ -195,13 +195,13 @@ impl InMemoryBuffer {
         Ok(())
     }
 
-    /// Asynchronously flush batch to SQLite if persistence is enabled,
-    /// while clearing the InMemoryBuffer (handle with care).
+    /// Flush a `NormalizedLog` batch to SQLite if persistence is enabled,
+    /// while clearing the InMemoryBuffer of the flushed logs, to prevent
+    /// unnecessary duplication overhead.
     ///
-    /// This does not clear logs from InMemoryBuffer after they are persisted
-    /// to SQLite
-    ///
-    /// This maintains efficiency, and reduces transaction overhead, improving throughput.
+    /// [Coming Soon]: Flush logs to SQLite persistence without clearing
+    /// InMemoryBuffer, to enable fast lookup by the `Shipper`, without requiring calls
+    /// SQLite persistence.
     pub async fn flush(&mut self, log: NormalizedLog) -> Result<()> {
         match self.flush_policy.as_str() {
             "batch_size" => {
@@ -343,16 +343,19 @@ impl InMemoryBuffer {
         }
     }
 
-    /// Asynchronously drain batch, removing logs from in-memory queue after
-    /// successful and confirmed consumption by SQLite.
+    /// Drain a `NormalizedLog` batch removing logs from in-memory queue, freeing up
+    /// space and ensuring an `InMemoryBuffer` remains performant at all times.
     ///
-    /// Basically sends NormalizedLogs in batches to Shipper module.
-    ///
-    /// Use the set `drain_policy` to determine how to drain the batch
+    /// **Use Cases**:
+    /// - `NormalizedLog` batch has been flushed to SQLite persistence
     pub async fn drain() -> Result<()> {}
 
-    /// Handle InMemoryBuffer overflow using the overflow_policy
-    /// set in log_collector.toml by user.
+    /// Handle `InMemoryBuffer` overflowing when capacity is approaching
+    /// or exceeding user configured buffer_capacity.
+    ///
+    /// This ensures buffer_capacity is not exceeded while pushing `NormalizedLog`
+    /// to `InMemoryBuffer`. An `InMemoryBuffer` overflowing is handled prior to pushing
+    /// `NormalizedLog` to it.
     async fn handle_overflow(&mut self) -> Result<bool> {
         match self.overflow_policy.as_str() {
             "drop_newest" => {
