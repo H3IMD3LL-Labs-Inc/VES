@@ -41,6 +41,7 @@ struct InMemoryBuffer {
     drain_policy: String,
     flush_policy: String,
     notify: Arc<Notify>,
+}
 
 /// Configuration-only durability
 #[derive(Debug, Deserialize, Clone)]
