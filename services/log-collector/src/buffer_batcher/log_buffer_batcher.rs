@@ -1,23 +1,3 @@
-// Components
-// 1. Buffer
-// Collects parsed/enriched logs into in-memory Buffer. If durability is set to sqlite,
-// also appends logs into a WAL table for persistence. Basically, acts like a queue ->
-// fast in-memory, optional safety net on disk(production).
-//
-// 2. Batcher
-// Watches Buffers, has 2 flush conditions; Size trigger(number of logs), Time trigger(time since last flush).
-// When triggered; collects a Batch from Buffer (and deletes from WAL if enabled), compresses the batch, returns
-// a compressed batch for use by the shipper.
-//
-// All behavior is defined by log-collector.toml, with the following basic control flow;
-// 1. Log arrives -> Push to in-memory, if durable set also append to WAL
-// 2. Batcher checks conditions -> if enough logs OR time elapsed: create batch
-// 3. Batch creation -> Drain logs from in-memory, if durable set delete correspondence from WAL
-// 4. Batch processing -> Compress with gzip, return compressed batch(to be sent to embedding service via Shipper)
-// 5. Failure handling -> in-memory mode: logs are already gone if process dies/crashes, durable mode: logs still
-// WAL -> retry on restart.
-//
-
 use crate::parser::parser::NormalizedLog;
 use rusqlite::{Connection, Result, params};
 use serde::Deserialize;
@@ -60,6 +40,7 @@ struct InMemoryBuffer {
     overflow_policy: String,
     drain_policy: String,
     flush_policy: String,
+    notify: Arc<Notify>,
 }
 
 /// Configuration-only durability
@@ -150,6 +131,7 @@ impl InMemoryBuffer {
             overflow_policy: buffer_config.overflow_policy.clone(),
             drain_policy: buffer_config.drain_policy.clone(),
             flush_policy: buffer_config.flush_policy.clone(),
+            notify: Arc::new(Notify::new()),
         }
     }
 
@@ -388,33 +370,20 @@ impl InMemoryBuffer {
     async fn handle_overflow(&mut self) -> Result<bool> {
         match self.overflow_policy.as_str() {
             "drop_newest" => {
-                // When buffer is full, reject incoming log.
-                // Preserve all older logs and silently discard/ignore
-                // newest one
                 eprintln!("Buffer full: dropping newest incoming log");
                 Ok(false)
             }
             "drop_oldest" => {
-                // When buffer is full, evict the oldest log to
-                // make room. Always accept the newest log, oldest
-                // history is discarded first
                 self.queue.pop_front();
                 Ok(true)
             }
             "block_with_backpressure" => {
-                // When buffer is full, producer must wait until
-                // there's space. No log is dropped, but log
-                // ingestion slows down.
                 while self.queue.len() >= self.buffer_capacity as usize {
                     self.notify.notified().await;
                 }
                 Ok(false)
             }
             "grow_capacity" => {
-                // When buffer is full, increase its capacity dynamically
-                // No log is ever dropped or blocked, buffer grows as needed.
-                // Prevent producers from oupacing consumers, to prevent OOM
-                // (out-of-memory).
                 self.queue.reserve(1);
                 eprintln!("buffer_capacity exceeded, capacity extended without memory re-allocation")
                 Ok(true)
