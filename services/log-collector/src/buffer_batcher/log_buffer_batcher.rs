@@ -275,14 +275,69 @@ impl InMemoryBuffer {
                 Ok(())
             }
             "hybrid_size_timeout" => {
-                // Trigger based on which is best-suited to the current scenario.
-                // Define the actual scenarios and which flush method is best based on these
-                // scenarios you have defined. DO NOT ADD MORE USER CONFIGURATION COMPLEXITY.
+                if self.queue.len() >= self.batch_size {
+                    match &mut self.durability {
+                        Durability::SQLite(conn) => {
+                            let batch_logs: Vec<NormalizedLog> = self.queue
+                                .iter()
+                                .take(self.batch_size)
+                                .cloned()
+                                .collect();
+
+                            for log in batch_logs {
+                                conn.execute(
+                                    "INSERT INTO normalized_logs (timestamp, level, message, metadata, raw_line) VALUES (?1, ?2, ?3, ?4, ?5)",
+                                    params![
+                                        log.timestamp.to_rfc3339(),
+                                        log.level,
+                                        log.message,
+                                        log.metadata.as_ref().map(|m| serde_json::to_string(m).unwrap()),
+                                        log.raw_line
+                                    ],
+                                )?;
+                            }
+                            self.last_flush_at = Instant::now();
+                        }
+                        Durability::InMemory => {
+                            eprintln!("InMemoryBuffer durability configured to `in-memory`, logs are currently not being persisted to SQLite");
+                        }
+                    }
+                }
+                if Instant::now().duration_since(self.last_flush_at) > Duration::from_millis(self.batch_timeout_ms) {
+                    match &mut self.durability {
+                        Durability::SQLite(conn) => {
+                            let batch_logs: Vec<NormalizedLog> = self.queue
+                                .iter()
+                                .take(self.queue.len())
+                                .cloned()
+                                .collect();
+
+                            for log in batch_logs {
+                                conn.execute(
+                                    "INSERT INTO normalized_logs (timestamp, level, message, metadata, raw_line) VALUES (?1, ?2, ?3, ?4, ?5)",
+                                    params![
+                                        log.timestamp.to_rfc3339(),
+                                        log.level,
+                                        log.message,
+                                        log.metadata.as_ref().map(|m| serde_json::to_string(m).unwrap()),
+                                        log.raw_line,
+                                    ],
+                                )?;
+                            }
+                            // TODO: run `drain()` to clear flushed logs from InMemoryBuffer
+
+                            self.last_flush_at = Instant::now();
+                        }
+                        Durability::InMemory => {
+                            eprintln!("InMemoryBuffer durability configured to `in-memory`, logs are currently not being persisted to SQLite")
+                        }
+                    }
+                }
 
                 Ok(())
             }
             other => {
-                eprintln!("No flush_policy configured. {} is not a flush_policy option", other);
+                eprintln!("No correct flush_policy configured. {} is not a flush_policy option", other);
                 Ok(())
             }
         }
