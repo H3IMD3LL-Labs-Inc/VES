@@ -226,10 +226,9 @@ impl InMemoryBuffer {
                                     ],
                                 )?;
                             }
-                            // TODO: Run `drain()` to clear InMemoryBuffer of already persisted logs
-                            // remember to consider that only the persisted elements should be deleted from InMemoryBuffer
-
                             self.last_flush_at = Instant::now();
+
+                            self.drain();
                         }
                         Durability::InMemory => {
                             eprintln!("InMemoryBuffer durability configured to `in-memory` logs are currently not flushed to SQLite persistent storage");
@@ -262,9 +261,9 @@ impl InMemoryBuffer {
                                     ],
                                 )?;
                             }
-                            // TODO: run `drain()` method to clear InMemoryBuffer of successfully persisted logs
-
                             self.last_flush_at = Instant::now();
+
+                            self.drain();
                         }
                         Durability::InMemory => {
                             eprintln!("InMemoryBuffer durability configured to `in-memory` logs are currently not flushed to SQLite persistent storage");
@@ -297,6 +296,8 @@ impl InMemoryBuffer {
                                 )?;
                             }
                             self.last_flush_at = Instant::now();
+
+                            self.drain();
                         }
                         Durability::InMemory => {
                             eprintln!("InMemoryBuffer durability configured to `in-memory`, logs are currently not being persisted to SQLite");
@@ -324,9 +325,9 @@ impl InMemoryBuffer {
                                     ],
                                 )?;
                             }
-                            // TODO: run `drain()` to clear flushed logs from InMemoryBuffer
-
                             self.last_flush_at = Instant::now();
+
+                            self.drain();
                         }
                         Durability::InMemory => {
                             eprintln!("InMemoryBuffer durability configured to `in-memory`, logs are currently not being persisted to SQLite")
@@ -346,9 +347,37 @@ impl InMemoryBuffer {
     /// Drain a `NormalizedLog` batch removing logs from in-memory queue, freeing up
     /// space and ensuring an `InMemoryBuffer` remains performant at all times.
     ///
+    /// `InMemoryBuffer` draining is dependant on configured **drain_policy** and
+    /// **flush_policy**, drain policies are intended to work with certain flush
+    /// policies. Users should configure flush and drain policies while considering
+    /// how they want both to work.
+    ///
     /// **Use Cases**:
-    /// - `NormalizedLog` batch has been flushed to SQLite persistence
-    pub async fn drain() -> Result<()> {}
+    /// - `NormalizedLog` batch has been flushed to SQLite persistence **flush()**.
+    pub async fn drain(&mut self) -> Result<()> {
+        match self.drain_policy.as_str() {
+            "drain_all" => {
+                self.queue.drain(..self.queue.len());
+                Ok(())
+            }
+            "drain_batch_size" => {
+                if self.queue.len() >= self.batch_size {
+                    self.queue.drain(..self.batch_size);
+                }
+                Ok(())
+            }
+            "drain_batch_timeout" => {
+                if Instant::now().duration_since(self.last_flush_at) > Duration::from_millis(self.batch_timeout_ms) {
+                    self.queue.drain(..self.queue.len());
+                }
+                Ok(())
+            }
+            other => {
+                eprintln!("No correct drain_policy configured. {} is not a drain_policy option", other);
+                Ok(())
+            }
+        }
+    }
 
     /// Handle `InMemoryBuffer` overflowing when capacity is approaching
     /// or exceeding user configured buffer_capacity.
