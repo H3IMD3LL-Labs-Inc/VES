@@ -41,7 +41,6 @@ struct InMemoryBuffer {
     drain_policy: String,
     flush_policy: String,
     notify: Arc<Notify>,
-}
 
 /// Configuration-only durability
 #[derive(Debug, Deserialize, Clone)]
@@ -65,14 +64,6 @@ impl InMemoryBuffer {
         toml::from_str(&buffer_config).expect("Failed to parse config file")
     }
 
-    /// Create a new `InMemoryBuffer` to store `NormalizedLog`
-    /// produced by the `parser`.
-    ///
-    /// The new buffer is configured at runtime based on user
-    /// configuration set in `log-collector.toml` file.
-    ///
-    /// **Recommended:** For use in production environments, ensure
-    /// buffer durability is set to `persistent => { sqlite = "parsed_log_buffer.db" }`
     pub async fn new(buffer_config: &BufferConfig) -> Self {
         let queue = match buffer_config.capacity_option.as_str() {
             "bounded" => {
@@ -135,8 +126,8 @@ impl InMemoryBuffer {
         }
     }
 
-    /// Check `InMemoryBuffer` capacity, for health/performance checks.
-    /// Currently, this has no implemented use case.
+    /// Check InMemoryBuffer's capacity. This is required to determine
+    /// actions in push(), drain(), flush() methods.
     pub fn check_buffer_capacity(&self) -> usize {
         let used_capacity = self.queue.len();
 
