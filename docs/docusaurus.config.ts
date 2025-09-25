@@ -1,142 +1,132 @@
-import {themes as prismThemes} from 'prism-react-renderer';
-import type {Config} from '@docusaurus/types';
-import type * as Preset from '@docusaurus/preset-classic';
-
-// This runs in Node.js - Don't use client-side code here (browser APIs, JSX...)
+import { themes as prismThemes } from "prism-react-renderer";
+import type { Config } from "@docusaurus/types";
+import type * as Preset from "@docusaurus/preset-classic";
 
 const config: Config = {
-  title: 'My Site',
-  tagline: 'Dinosaurs are cool',
-  favicon: 'img/favicon.ico',
+  stylesheets: [
+    {
+      href: "https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600;700&display=swap",
+      type: "text/css",
+    },
+  ],
 
-  // Future flags, see https://docusaurus.io/docs/api/docusaurus-config#future
+  title: "VES - Vector Enhanced Search",
+  tagline: "Semantic log search at scale.",
+  favicon: "img/favicon.ico", // TODO: swap for H3IMD3LL Labs logo
+
   future: {
-    v4: true, // Improve compatibility with the upcoming Docusaurus v4
+    v4: true,
   },
 
-  // Set the production url of your site here
-  url: 'https://your-docusaurus-site.example.com',
-  // Set the /<baseUrl>/ pathname under which your site is served
-  // For GitHub pages deployment, it is often '/<projectName>/'
-  baseUrl: '/',
+  organizationName: "H3IMD3LL Labs, Inc.",
+  projectName: "VES",
 
-  // GitHub pages deployment config.
-  // If you aren't using GitHub pages, you don't need these.
-  organizationName: 'facebook', // Usually your GitHub org/user name.
-  projectName: 'docusaurus', // Usually your repo name.
+  url: "https://ves.heimdelllabs.cloud",
+  baseUrl: "/",
 
-  onBrokenLinks: 'throw',
-  onBrokenMarkdownLinks: 'warn',
+  onBrokenLinks: "throw",
+  onBrokenMarkdownLinks: "warn",
 
-  // Even if you don't use internationalization, you can use this field to set
-  // useful metadata like html lang. For example, if your site is Chinese, you
-  // may want to replace "en" with "zh-Hans".
   i18n: {
-    defaultLocale: 'en',
-    locales: ['en'],
+    defaultLocale: "en",
+    locales: ["en"],
   },
 
   presets: [
     [
-      'classic',
+      "classic",
       {
         docs: {
-          sidebarPath: './sidebars.ts',
-          // Please change this to your repo.
-          // Remove this to remove the "edit this page" links.
-          editUrl:
-            'https://github.com/facebook/docusaurus/tree/main/packages/create-docusaurus/templates/shared/',
+          sidebarPath: "./sidebars.ts",
+          editUrl: "https://github.com/H3IMD3LL-Labs-Inc/VES",
         },
         blog: {
           showReadingTime: true,
           feedOptions: {
-            type: ['rss', 'atom'],
+            type: ["rss", "atom"],
             xslt: true,
           },
-          // Please change this to your repo.
-          // Remove this to remove the "edit this page" links.
-          editUrl:
-            'https://github.com/facebook/docusaurus/tree/main/packages/create-docusaurus/templates/shared/',
-          // Useful options to enforce blogging best practices
-          onInlineTags: 'warn',
-          onInlineAuthors: 'warn',
-          onUntruncatedBlogPosts: 'warn',
+          editUrl: "https://github.com/H3IMD3LL-Labs-Inc/VES",
+          onInlineTags: "warn",
+          onInlineAuthors: "warn",
+          onUntruncatedBlogPosts: "warn",
         },
         theme: {
-          customCss: './src/css/custom.css',
+          customCss: "./src/css/custom.css", // override Infima with Inter + brand colors
         },
       } satisfies Preset.Options,
     ],
   ],
 
   themeConfig: {
-    // Replace with your project's social card
-    image: 'img/docusaurus-social-card.jpg',
+    image: "img/social-card.png", // TODO: replace with VES social card
+    colorMode: {
+      defaultMode: "light",
+      disableSwitch: false, // allow light/dark toggle like Chroma
+      respectPrefersColorScheme: true,
+    },
     navbar: {
-      title: 'My Site',
+      style: "primary", // makes it sleek like Chroma's top nav
       logo: {
-        alt: 'My Site Logo',
-        src: 'img/logo.svg',
+        alt: "VES Logo",
+        src: "img/logo.svg", // TODO: replace with H3IMD3LL Labs logo
       },
       items: [
+        { to: "docs/overview/introduction", label: "Docs", position: "left" },
+        { to: "/blog", label: "Updates", position: "left" },
+        { to: "pages/pricing", label: "Pricing", position: "left" },
         {
-          type: 'docSidebar',
-          sidebarId: 'tutorialSidebar',
-          position: 'left',
-          label: 'Tutorial',
+          href: "https://github.com/H3IMD3LL-Labs-Inc/VES",
+          label: "GitHub",
+          position: "right",
         },
-        {to: '/blog', label: 'Blog', position: 'left'},
         {
-          href: 'https://github.com/facebook/docusaurus',
-          label: 'GitHub',
-          position: 'right',
+          to: "docs/overview/getting-started",
+          label: "Get started",
+          position: "right",
+          className: "navbar__link--cta", // styled in custom.css as a button
         },
       ],
     },
     footer: {
-      style: 'dark',
+      style: "light",
       links: [
         {
-          title: 'Docs',
+          title: "Product",
           items: [
-            {
-              label: 'Tutorial',
-              to: '/docs/intro',
-            },
+            { label: "Docs", to: "/docs/overview/introduction" },
+            { label: "Pricing", to: "pages/pricing" },
+            { label: "Changelog", to: "pages/changelog" },
           ],
         },
         {
-          title: 'Community',
+          title: "Community",
           items: [
             {
-              label: 'Stack Overflow',
-              href: 'https://stackoverflow.com/questions/tagged/docusaurus',
+              label: "Discord",
+              href: "https://discordapp.com/invite/heimdelllabs",
             },
-            {
-              label: 'Discord',
-              href: 'https://discordapp.com/invite/docusaurus',
-            },
-            {
-              label: 'X',
-              href: 'https://x.com/docusaurus',
-            },
+            { label: "GitHub", href: "https://github.com/H3IMD3LL-Labs-Inc" },
+            { label: "~~Twitter~~ X", href: "https://x.com/heimdell_labs" },
           ],
         },
         {
-          title: 'More',
+          title: "Company",
           items: [
-            {
-              label: 'Blog',
-              to: '/blog',
-            },
-            {
-              label: 'GitHub',
-              href: 'https://github.com/facebook/docusaurus',
-            },
+            { label: "About", to: "/docs/overview/about" },
+            { label: "Careers", href: "https://careers.heimdelllabs.cloud" },
+          ],
+        },
+        {
+          title: "Legal",
+          items: [
+            { label: "Privacy", to: "pages/website-privacy" },
+            { label: "Terms", to: "pages/website-terms" },
+            { label: "Security", to: "pages/security" },
           ],
         },
       ],
-      copyright: `Copyright © ${new Date().getFullYear()} My Project, Inc. Built with Docusaurus.`,
+      copyright: `© ${new Date().getFullYear()} H3IMD3LL Labs, Inc.`,
     },
     prism: {
       theme: prismThemes.github,
