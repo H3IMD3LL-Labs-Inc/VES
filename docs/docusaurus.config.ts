@@ -10,7 +10,7 @@ const config: Config = {
     },
   ],
 
-  title: "VES - Vector Enhanced Search",
+  title: "VES",
   tagline: "Semantic log search at scale.",
   favicon: "img/favicon.ico", // TODO: swap for H3IMD3LL Labs logo
 
@@ -62,8 +62,8 @@ const config: Config = {
     image: "img/social-card.png", // TODO: replace with VES social card
     colorMode: {
       defaultMode: "light",
-      disableSwitch: false, // allow light/dark toggle like Chroma
-      respectPrefersColorScheme: true,
+      disableSwitch: true, // allow light/dark toggle like Chroma
+      respectPrefersColorScheme: false,
     },
     navbar: {
       style: "primary", // makes it sleek like Chroma's top nav

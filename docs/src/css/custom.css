@@ -55,16 +55,27 @@
 
 /* === Global Variables === */
 :root {
-    /* VES Brand Colors */
-    --ifm-color-primary: #2e8555;
-    --ifm-color-primary-dark: #29784c;
-    --ifm-color-primary-darker: #277148;
-    --ifm-color-primary-darkest: #205d3b;
-    --ifm-color-primary-light: #33925d;
-    --ifm-color-primary-lighter: #359962;
-    --ifm-color-primary-lightest: #3cad6e;
-    --ifm-code-font-size: 95%;
-    --docusaurus-highlighted-code-line-bg: rgba(0, 0, 0, 0.1);
+    /* === Brand Colors === */
+    --ifm-color-primary: #6c2bd9; /* Purple */
+    --ifm-color-primary-dark: #5b23b8;
+    --ifm-color-primary-darker: #4a1b97;
+    --ifm-color-primary-darkest: #391477;
+    --ifm-color-primary-light: #7d3fea;
+    --ifm-color-primary-lighter: #8e5af0;
+    --ifm-color-primary-lightest: #a373f5;
+
+    /* Secondary / Accent */
+    --ifm-color-secondary: #f97316; /* Orange */
+    --ifm-color-secondary-dark: #ea580c;
+    --ifm-color-secondary-light: #fb923c;
+
+    /* Backgrounds */
+    --ifm-background-color: #ffffff; /* White */
+    --ifm-background-surface-color: #ffffff;
+
+    /* Text */
+    --ifm-font-color-base: #000000; /* Black */
+    --ifm-font-color-secondary: #1e3a8a; /* Deep Blue accent */
 
     /* Typography */
     --ifm-font-family-base: "Inter", Arial, sans-serif;
@@ -90,8 +101,15 @@ h6 {
 .hero {
     padding: 6rem 2rem;
     text-align: center;
-    background: var(--ifm-color-primary);
+    background: var(--ifm-background-color);
     color: white;
+}
+
+.heroBanner {
+    padding: 6rem 2rem;
+    text-align: center;
+    background: var(--ifm-color-background-color);
+    color: #000000;
 }
 
 .hero__title {
@@ -117,6 +135,12 @@ h6 {
     padding: 0.75rem 1.5rem;
     border-radius: 8px;
     box-shadow: 0 4px 10px rgba(0, 0, 0, 0.15);
+}
+
+.contentContainer {
+    max-width: 500px;
+    margin: 0 auto;
+    padding: 2rem 1rem;
 }
 
 /* For readability concerns, you should choose a lighter palette in dark mode. */
