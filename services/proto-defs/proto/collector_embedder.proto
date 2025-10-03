@@ -29,4 +29,5 @@ service LogCollector {
   rpc GetVersion(google.protobuf.Empty) returns (VersionInfo);
   rpc GetStats(google.protobuf.Empty) returns (ServiceMetrics);
   // TODO: Error handling / gRPC status codes
+  // TODO: Ship logs to embedding-service
 }
