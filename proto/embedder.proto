@@ -1,0 +1,11 @@
+syntax = "proto3";
+
+package embedder;
+
+import "common.proto";
+
+message EmbedResponse { repeated float vector = 1; }
+
+service Embedder {
+  rpc EmbedLog(stream common.NormalizedLog) returns (stream EmbedResponse);
+}
