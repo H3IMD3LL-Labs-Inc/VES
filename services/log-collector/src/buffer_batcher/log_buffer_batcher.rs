@@ -30,17 +30,17 @@ struct BufferConfig {
 
 /// In-Memory Buffer (runtime structure)
 #[derive(Debug)]
-struct InMemoryBuffer {
-    queue: VecDeque<NormalizedLog>,
-    buffer_capacity: u64,
-    batch_size: usize,
-    batch_timeout_ms: u64,
-    last_flush_at: Instant,
-    durability: Durability,
-    overflow_policy: String,
-    drain_policy: String,
-    flush_policy: String,
-    notify: Arc<Notify>,
+pub struct InMemoryBuffer {
+    pub queue: VecDeque<NormalizedLog>,
+    pub buffer_capacity: u64,
+    pub batch_size: usize,
+    pub batch_timeout_ms: u64,
+    pub last_flush_at: Instant,
+    pub durability: Durability,
+    pub overflow_policy: String,
+    pub drain_policy: String,
+    pub flush_policy: String,
+    pub notify: Arc<Notify>,
 }
 
 /// Configuration-only durability
