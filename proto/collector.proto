@@ -1,6 +1,6 @@
 syntax = "proto3";
 
-package log_collector;
+package collector;
 
 import "common.proto";
 
