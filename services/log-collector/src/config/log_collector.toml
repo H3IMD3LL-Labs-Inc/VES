@@ -8,6 +8,19 @@ overflow_policy = "drop_oldest"                             # Options: drop_olde
 flush_policy = "batch_size"                                 # Options: batch_size, batch_timeout, hybrid_size_timeout, on_demand(coming soon)
 drain_policy = "batch_size"                                 # Options: drain_batch_size, drain_batch_timeout, drain_batch_size_timeout, drain_all
 
+[shipper]
+embedder_target_addr = "https://127.0.0.1:50051"            # gRPC address of Embedding Service
+connection_timeout_ms = 500                                 # Time to wait before failing a new connection
+max_reconnect_attempts = 10                                 # (optional) Retry limit before Shipper declares failure
+initial_retry_delay_ms = 500                                # Starting delay between retries(e.g, 500ms)
+max_retry_delay_ms = 30000                                  # Ceiling for exponential backoff (e.g, 30s)
+backoff_factor = 2.0                                        # Multiplier for retry growth (e.g, 2.0 = doubles each time)
+retry_jitter = 0.2                                          # Random jitter percentage to avoid thundering herd problem
+send_timeout_ms = 3000                                      # Max timeout to push one batch into gRPC stream
+response_timeout_ms = 10000                                 # Max timeout to wait for a response from Embedding Service, before declaring stream unhealthy
+metrics_enabled = true                                      # Boolean whether or not to expose service metrics; queue length, retry counts, etc.
+log_level = "info"                                          # Verbosity of exposed Shipper logs
+
 [watcher]
 
 

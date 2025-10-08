@@ -1,0 +1,18 @@
+syntax = "proto3";
+
+package common;
+
+import "google/protobuf/timestamp.proto";
+
+message Metadata {
+  string stream = 1;
+  optional string flag = 2;
+}
+
+message NormalizedLog {
+  google.protobuf.Timestamp timestamp = 1;
+  optional string level = 2;
+  string message = 3;
+  optional Metadata metadata = 4;
+  string raw_line = 5;
+}

@@ -1,0 +1,11 @@
+syntax = "proto3";
+
+package collector;
+
+import "common.proto";
+
+message CollectResponse { bool accepted = 1; }
+
+service LogCollector {
+  rpc StreamLog(stream common.NormalizedLog) returns (stream CollectResponse);
+}
