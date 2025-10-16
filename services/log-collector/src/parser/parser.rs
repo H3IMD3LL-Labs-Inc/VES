@@ -45,55 +45,70 @@ enum SyslogVariant {
     RFC5424,
 }
 
-/// Detects log format from a raw line.
-///
-/// This function tries to identify whether the log line
-/// matches one of the supported log formats in [`LogFormat`],
-/// which is defined in [`crate::parser`].
-///
-/// - If log format does not match `LogFormat::CRI`,
-/// `LogFormat::DockerJSON`, `LogFormat::ArbitraryJSON` or
-/// `LogFormat::Syslog(SyslogVariant)` detection will default
-/// to `LogFormat::PlainText`
-///
-/// - `LogFormat::Syslog` parsing currently supports `RFC3164` and `RFC5424` format Syslogs. See:
-///
-/// Returns a [`LogFormat`] enum describing the detected type.
-async fn detect_format(line: &str) -> LogFormat {
-    let cri_re =
-        Regex::new(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d+Z (stdout|stderror) [FP]").unwrap();
-    if cri_re.is_match(line) {
-        return LogFormat::CRI;
+impl NormalizedLog {
+    /// Detects log format from a raw line.
+    ///
+    /// This function tries to identify whether the log line
+    /// matches one of the supported log formats in [`LogFormat`],
+    /// which is defined in [`crate::parser`].
+    ///
+    /// - If log format does not match `LogFormat::CRI`,
+    /// `LogFormat::DockerJSON`, `LogFormat::ArbitraryJSON` or
+    /// `LogFormat::Syslog(SyslogVariant)` detection will default
+    /// to `LogFormat::PlainText`
+    ///
+    /// - `LogFormat::Syslog` parsing currently supports `RFC3164` and `RFC5424` format Syslogs. See:
+    ///
+    /// Returns a [`LogFormat`] enum describing the detected type.
+    pub async fn detect_format(line: &str) -> LogFormat {
+        let cri_re =
+            Regex::new(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d+Z (stdout|stderror) [FP]")
+                .unwrap();
+        if cri_re.is_match(line) {
+            return LogFormat::CRI;
+        }
+
+        if let Ok(log) = serde_json::from_str::<serde_json::Value>(line) {
+            if log.get("log").is_some() && log.get("time").is_some() {
+                return LogFormat::DockerJSON;
+            } else {
+                return LogFormat::ArbitraryJSON;
+            }
+        }
+
+        let syslog_rfc: [&str; 2] = [
+            r"^<\d+[A-Z][a-z]{2}\s+\d{1,2}\s\d{2}:\d{2}:\d{2}",
+            r"^<\d+>\d\s\d{4}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z",
+        ];
+
+        let syslog_3164_re = Regex::new(syslog_rfc[0]).unwrap();
+        let syslog_5424_re = Regex::new(syslog_rfc[1]).unwrap();
+
+        if syslog_3164_re.is_match(line) {
+            return LogFormat::Syslog(SyslogVariant::RFC3164);
+        }
+
+        if syslog_5424_re.is_match(line) {
+            return LogFormat::Syslog(SyslogVariant::RFC5424);
+        }
+
+        LogFormat::Unknown
     }
 
-    if let Ok(log) = serde_json::from_str::<serde_json::Value>(line) {
-        if log.get("log").is_some() && log.get("time").is_some() {
-            return LogFormat::DockerJSON;
-        } else {
-            return LogFormat::ArbitraryJSON;
+    // TODO: Select an appropriate parser based on log formate determined by detect_format
+    pub async fn select_parser(line: &str) -> Result<NormalizedLog, String> {
+        // Detect the log line's format
+        let detected_format = Self::detect_format(line).await;
+        // Match this format to an appropriate parser for parsing
+        match detected_format {
+            LogFormat::CRI => Self::cri_parser(line).await,
+            LogFormat::DockerJSON => Self::docker_json_parser(line).await,
+            LogFormat::ArbitraryJSON => Self::arbitrary_json_parser(line).await,
+            LogFormat::Syslog(_) => Self::syslog_parser(line).await,
+            LogFormat::Unknown => Err("Unknown log format".to_string()),
         }
     }
 
-    let syslog_rfc: [&str; 2] = [
-        r"^<\d+[A-Z][a-z]{2}\s+\d{1,2}\s\d{2}:\d{2}:\d{2}",
-        r"^<\d+>\d\s\d{4}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z",
-    ];
-
-    let syslog_3164_re = Regex::new(syslog_rfc[0]).unwrap();
-    let syslog_5424_re = Regex::new(syslog_rfc[1]).unwrap();
-
-    if syslog_3164_re.is_match(line) {
-        return LogFormat::Syslog(SyslogVariant::RFC3164);
-    }
-
-    if syslog_5424_re.is_match(line) {
-        return LogFormat::Syslog(SyslogVariant::RFC5424);
-    }
-
-    LogFormat::Unknown
-}
-
-impl NormalizedLog {
     /// Provides parsing for [`LogFormat::CRI`] logs.
     /// Requires output from [`crate::parser::detect_format`]
     /// indicating a log is `LogFormat::CRI` as input.
