@@ -6,6 +6,7 @@ mod metadata_enricher;
 mod models;
 mod parser;
 mod proto;
+mod server;
 mod shipper;
 mod tailer;
 mod watcher;
