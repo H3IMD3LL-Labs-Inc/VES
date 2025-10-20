@@ -95,10 +95,28 @@ pub mod log_collector_client {
             self.inner = self.inner.max_encoding_message_size(limit);
             self
         }
+        /// Public-facing ingestion endpoint:
+        ///
+        /// * Clients (apps, agents, tools, etc.) open a streaming RPC and push RawLog
+        ///  messages.
+        /// * The Log Collector micro-service normalizes each RawLog into NormalizedLog
+        ///  internally.
+        /// * The collector then forwards NormalizedLog entries to the Embedding
+        ///  micro-service (via shipper module), and emits CollectResponse
+        ///  acknowledgements back.
+        ///
+        /// Semantics & Guidance:
+        ///
+        /// * Clients should treat the RPC as fire-and-forget for best througput: the
+        ///  log collector will acknowledge when it has accepted/queued a log, not
+        ///  necessarily when the embedding is fully persisted by the Embedding
+        ///  micro-service (this keeps log ingestion decoupled).
+        /// * The log collector may reply `accepted: false` when validation fails or
+        ///  when internal backpressure forces a rejection.
         pub async fn stream_log(
             &mut self,
             request: impl tonic::IntoStreamingRequest<
-                Message = super::super::common::NormalizedLog,
+                Message = super::super::common::RawLog,
             >,
         ) -> std::result::Result<
             tonic::Response<tonic::codec::Streaming<super::CollectResponse>>,
@@ -142,11 +160,27 @@ pub mod log_collector_server {
             >
             + std::marker::Send
             + 'static;
+        /// Public-facing ingestion endpoint:
+        ///
+        /// * Clients (apps, agents, tools, etc.) open a streaming RPC and push RawLog
+        ///  messages.
+        /// * The Log Collector micro-service normalizes each RawLog into NormalizedLog
+        ///  internally.
+        /// * The collector then forwards NormalizedLog entries to the Embedding
+        ///  micro-service (via shipper module), and emits CollectResponse
+        ///  acknowledgements back.
+        ///
+        /// Semantics & Guidance:
+        ///
+        /// * Clients should treat the RPC as fire-and-forget for best througput: the
+        ///  log collector will acknowledge when it has accepted/queued a log, not
+        ///  necessarily when the embedding is fully persisted by the Embedding
+        ///  micro-service (this keeps log ingestion decoupled).
+        /// * The log collector may reply `accepted: false` when validation fails or
+        ///  when internal backpressure forces a rejection.
         async fn stream_log(
             &self,
-            request: tonic::Request<
-                tonic::Streaming<super::super::common::NormalizedLog>,
-            >,
+            request: tonic::Request<tonic::Streaming<super::super::common::RawLog>>,
         ) -> std::result::Result<tonic::Response<Self::StreamLogStream>, tonic::Status>;
     }
     #[derive(Debug)]
@@ -230,9 +264,8 @@ pub mod log_collector_server {
                     struct StreamLogSvc<T: LogCollector>(pub Arc<T>);
                     impl<
                         T: LogCollector,
-                    > tonic::server::StreamingService<
-                        super::super::common::NormalizedLog,
-                    > for StreamLogSvc<T> {
+                    > tonic::server::StreamingService<super::super::common::RawLog>
+                    for StreamLogSvc<T> {
                         type Response = super::CollectResponse;
                         type ResponseStream = T::StreamLogStream;
                         type Future = BoxFuture<
@@ -242,7 +275,7 @@ pub mod log_collector_server {
                         fn call(
                             &mut self,
                             request: tonic::Request<
-                                tonic::Streaming<super::super::common::NormalizedLog>,
+                                tonic::Streaming<super::super::common::RawLog>,
                             >,
                         ) -> Self::Future {
                             let inner = Arc::clone(&self.0);

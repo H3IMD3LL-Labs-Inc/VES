@@ -95,6 +95,10 @@ pub mod embedder_client {
             self.inner = self.inner.max_encoding_message_size(limit);
             self
         }
+        /// The Embedding micro-service consumes NormalizedLog messages (produced by
+        /// the Log Collector). This proto is *not* the public ingestion contract; it
+        /// is used internally by the Log Collector to forward normalized logs for
+        /// embedding.
         pub async fn embed_log(
             &mut self,
             request: impl tonic::IntoStreamingRequest<
@@ -142,6 +146,10 @@ pub mod embedder_server {
             >
             + std::marker::Send
             + 'static;
+        /// The Embedding micro-service consumes NormalizedLog messages (produced by
+        /// the Log Collector). This proto is *not* the public ingestion contract; it
+        /// is used internally by the Log Collector to forward normalized logs for
+        /// embedding.
         async fn embed_log(
             &self,
             request: tonic::Request<

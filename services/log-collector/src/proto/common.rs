@@ -19,3 +19,12 @@ pub struct NormalizedLog {
     #[prost(string, tag = "5")]
     pub raw_line: ::prost::alloc::string::String,
 }
+#[derive(Clone, PartialEq, Eq, Hash, ::prost::Message)]
+pub struct RawLog {
+    #[prost(message, optional, tag = "1")]
+    pub timestamp: ::core::option::Option<::prost_types::Timestamp>,
+    #[prost(string, tag = "2")]
+    pub source: ::prost::alloc::string::String,
+    #[prost(string, tag = "3")]
+    pub raw_line: ::prost::alloc::string::String,
+}
