@@ -11,9 +11,9 @@ use tonic::{Request, Response, Status, transport::Server};
 
 #[derive(Debug, Default)]
 pub struct LogCollectorService {
-    parser: NormalizedLog,
-    buffer_batcher: InMemoryBuffer,
-    shipper: Shipper,
+    pub parser: NormalizedLog,
+    pub buffer_batcher: InMemoryBuffer,
+    pub shipper: Shipper,
 }
 
 // Bind log collector application logic(LogCollectorService) to
