@@ -1,3 +1,26 @@
+//! Shipper - responsibility and behavior
+//!
+//! The Shipper is a focused component that takes *already-normalized* logs (batches `NormalizedLog`)
+//! and reliably forwards them to the Embedding micro-service over gRPC.
+//!
+//! Key responsibilities:
+//! - Maintain and manage an outbound gRPC channel/client (EmbedderClient).
+//! - Opens a bi-directional streaming RPC to the embedder and stream logs.
+//! - Handle reconnects with exponential backoff + jitter when Embedder is
+//! unreachable.
+//! - Process EmbedResponse message from the Embedding micro-service.
+//! - Decouple the pipeline by exposing a simple `send(batch)` API; callers
+//! do not need to handle network failures or retries.
+//!
+//! Important design notes:
+//! - The Shipper *does not* implement large-scale buffering or durability -
+//! that's the responsibility of the buffer-batcher module (which persists to
+//! SQLite or keeps a bounded in-memory queue, depending on configuration).
+//! - The Shipper keeps a *small* handoff channel (mpsc) to decouple the pipeline
+//! so that callers can enqueue batches without blocking on network I/O.
+//! - The Shipper returns a `QueueFull` error when the handoff channel is saturated;
+//! the buffer-batcher should react according to its overflow policy.
+
 use rand::Rng;
 use serde::Deserialize;
 use std::time::Duration;
@@ -34,12 +57,22 @@ struct ShipperConfig {
     log_level: String,
 }
 
-/// Shipper (runtime struct)
-/// - Holds sending side of the channel. `run_worker` has the other side,
-/// spawned as a background task. Ensuring decoupling, shipper runs independently of
-/// other log collector functionality.
-#[derive(Debug)]
-struct Shipper {
+/// Shipper
+///
+/// Runtime object owned by the Collector that exposes a `send(batch)` API to enqueue
+/// normalized log batches for delivery to the Embedder. The Shipper:
+///     - owns the background worker that manages the gRPC connection,
+///     - accepts small handoff batches via a bounded `mpsc::Sender`,
+///     - does not provide durable storage - buffering/persistence lives in buffer-batcher.
+///
+/// Why a small mpsc channel?
+///     - It decouples the caller from network ops so the pipeline continues to produce
+///     batches while the Shipper performs I/O.
+///     - It is intentionally *small* since the authoritative buffer and overflow policy
+///     are managed by the buffer-batcher (to avoid duplicate buffering and uncontrolled
+///     memory growth).
+#[derive(Debug, Clone)]
+pub struct Shipper {
     sender: mpsc::Sender<InMemoryBuffer>,
 }
 
@@ -76,10 +109,16 @@ impl Shipper {
         Self { sender: tx }
     }
 
-    /// Public API: send flushed batch from buffer-batcher
-    /// - Actual API exposed to the rest of the collector pipeline. Takes an `InMemoryBuffer`, pushes into
-    /// channel -> non-blocking hand-off to worker. If full, returns `QueueFull` error.
-    /// - This is the public-accessible surface for the Shipper.
+    /// Enqueue a normalized batch for shipping.
+    ///
+    /// Behavior:
+    /// - Attempts to send the batch into an internal bounded channel.
+    /// - If the channel is full (sender closed or channel saturated), returns `QueueFull`.
+    ///
+    /// Design decisions:
+    /// - Returning `QueueFull` surfaces backpressure to the caller (the buffer-batcher),
+    /// which can then apply its configured overflow policy.
+    /// - We do NOT block here indefinitely; upstream components decide how to behave.
     pub async fn send(&self, batch: InMemoryBuffer) -> Result<(), ShipperError> {
         self.sender
             .send(batch)
@@ -88,17 +127,24 @@ impl Shipper {
     }
 }
 
-/// Background worker that owns the gRPC connection
+/// Backgground worker loog (owns the outbound gRPC stream).
 ///
-/// Infinite loop:
-/// - Try to connect with retries(`connect_with_retry`)
-/// - If connected:
-///     - Open bi-directional stream (`embed_log()` RPC).
-///     - Split into:
-///         - `send_loop`: pulls batches from channel -> forwards logs downstream.
-///         - `recv_loop`: listens for `EmbedResponse` from embedder.
-///     - Uses `tokio::select!` to multiplex send/recv.
-/// - On error -> reconnect logic triggers
+/// High level algorithm:
+/// 1. Repeatedly attempt to connect to the Embedder using `connect_with_retry`.
+/// 2. On success, open the bi-directional stream (Embedder.embed_log).
+/// 3. Creates two logical loops multiplexed via `tokio::select!`:
+///     - send loop: drain the mpsc receiver and push each NormalizedLog into the request stream.
+///     - recv loop: read EmbedResponse messages from the response stream and handle them.
+/// 4. If either loop fails (send error, response error, stream closed), break the inner loop
+/// and retry the connection (connect_with_retry).
+///
+/// Failure semantics:
+/// - Transient network errors will cause reconnect attempts with backoff.
+/// - Persistent failures eventually bubble up as logs/metrics; the buffer-batcher guarantees
+/// durability if configured (SQLite).
+///
+/// Note: The worker keeps the Embedder connection transiently alive - if the Embedder
+/// closes the stream the worker will tear it down and re-establish it.
 async fn run_worker(config: ShipperConfig, mut rx: mpsc::Receiver<InMemoryBuffer>) {
     loop {
         match connect_with_retry(&config).await {
@@ -154,12 +200,17 @@ async fn run_worker(config: ShipperConfig, mut rx: mpsc::Receiver<InMemoryBuffer
     }
 }
 
-/// Retry connection with exponential back-off
-/// - Keeps retrying until success or `max_reconnect_attempts`.
-/// - Exponential back-off (`backoff_factor`) prevents hammering.
-/// - Jitter (`retry_jitter`) prevents thundering herd problem if multiple
-/// shippers restart at once.
-/// - Each retry failure -> logs + sleeps before retry.
+/// Connect to the Embedder with exponential backoff + jitter
+///
+/// Policy:
+/// - Start with `initial_retry_delay_ms`.
+/// - Multiply delay by `backoff_factor` on each failed attempt, capping at `max_retry_delay_ms`.
+/// - Apply jitter to randomize retry timing (prevents thundering herd problem).
+/// - Respect `max_reconnect_attempts` (if set); otherwise retry indefinitely.
+///
+/// Observability:
+/// - Emit logs or metrics on each failed attempt and on successful re-connect.
+/// - Timeouts for the connection attempt come from `connection_timeout_ms`.
 async fn connect_with_retry(
     config: &ShipperConfig,
 ) -> Result<EmbedderClient<Channel>, tonic::transport::Error> {
@@ -204,7 +255,15 @@ async fn connect_with_retry(
     }
 }
 
-/// Handle responses from embedding service
+/// Handle EmbedResponse messages from the Embedder micro-service.
+///
+/// Responsibilities:
+/// - Persist or forward embedding vectors to storage/caches if needed.
+/// - Increment metrics (embeddings_received_total).
+/// - Optionally correlate the response with the original NormalizedLog (if IDs are used).
+///
+/// Note: The Shipper should not perform heavy synchronous work here; prefer batching updates
+/// or offloading to another task to keep the receive loop responsive.
 fn handle_embed_response(resp: EmbedResponse) {
     // TODO: Handle response from Embedding service
 }
