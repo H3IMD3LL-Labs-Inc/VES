@@ -1,5 +1,5 @@
 [buffer]
-capacity_option = "unbounded"                              # Options: bounded, unbounded
+capacity_option = "unbounded"                               # Options: bounded, unbounded
 buffer_capacity = 10000
 batch_size = 200
 batch_timeout_ms = 500

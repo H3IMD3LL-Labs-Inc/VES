@@ -1,4 +1,5 @@
 use crate::parser::parser::NormalizedLog;
+use crate::helpers::load_config::BufferConfig;
 use rusqlite::{Connection, Result, params};
 use serde::Deserialize;
 use tokio::time::Instant;
@@ -8,25 +9,6 @@ use std::time::Duration;
 use tokio::fs;
 use tokio::task;
 use tokio::sync::Notify;
-
-/// Configuration
-#[derive(Debug, Deserialize)]
-struct Config {
-    pub buffer: BufferConfig,
-}
-
-/// Buffer configuration
-#[derive(Debug, Deserialize)]
-struct BufferConfig {
-    capacity_option: String,
-    buffer_capacity: u64,
-    batch_size: usize,
-    batch_timeout_ms: u64,
-    durability: DurabilityConfig,
-    overflow_policy: String,
-    drain_policy: String,
-    flush_policy: String,
-}
 
 /// In-Memory Buffer (runtime structure)
 #[derive(Debug, Clone)]
@@ -43,14 +25,6 @@ pub struct InMemoryBuffer {
     pub notify: Arc<Notify>,
 }
 
-/// Configuration-only durability
-#[derive(Debug, Deserialize, Clone)]
-#[serde(rename_all = "kebab-case")]
-pub enum DurabilityConfig {
-    InMemory,
-    SQLite(String),
-}
-
 /// Runtime durability (contains real durability resources used by InMemoryBuffer)
 #[derive(Debug)]
 pub enum Durability {
@@ -59,12 +33,6 @@ pub enum Durability {
 }
 
 impl InMemoryBuffer {
-    pub async fn load_config(path: &str) -> BufferConfig {
-        let buffer_config = std::fs::read_to_string(path).expect("Failed to read config file");
-
-        toml::from_str(&buffer_config).expect("Failed to parse config file")
-    }
-
     pub async fn new(buffer_config: &BufferConfig) -> Self {
         let queue = match buffer_config.capacity_option.as_str() {
             "bounded" => {

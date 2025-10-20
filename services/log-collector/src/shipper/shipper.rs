@@ -30,32 +30,9 @@ use tokio::time::sleep;
 use tonic::transport::{Channel, Endpoint};
 
 use crate::buffer_batcher::log_buffer_batcher::InMemoryBuffer;
+use crate::helpers::load_config::ShipperConfig;
 use crate::proto::common::NormalizedLog;
 use crate::proto::embedder::{EmbedResponse, embedder_client::EmbedderClient};
-
-/// Configuration
-/// - Wraps `ShipperConfig`, making it possible to embed into `log_collector.toml`.
-#[derive(Debug, Deserialize)]
-struct Config {
-    pub shipper: ShipperConfig,
-}
-
-/// Shipper Configuration
-/// - Defines tunable configuration for Shipper at runtime
-#[derive(Debug, Deserialize)]
-struct ShipperConfig {
-    embedder_target_addr: String,
-    connection_timeout_ms: u64,
-    max_reconnect_attempts: Option<u64>,
-    initial_retry_delay_ms: u64,
-    max_retry_delay_ms: u64,
-    backoff_factor: f64,
-    retry_jitter: f64,
-    send_timeout_ms: u64,
-    response_timeout_ms: u64,
-    metrics_enabled: bool,
-    log_level: String,
-}
 
 /// Shipper
 ///
@@ -90,14 +67,6 @@ pub enum ShipperError {
 }
 
 impl Shipper {
-    /// Read `log_collector.toml` Shipper configuration and deserialize into `ShipperConfig`.
-    /// Allows tweaking Shipper behaviour at runtime without code changes.
-    pub async fn load_config(path: &str) -> ShipperConfig {
-        let shipper_config = std::fs::read_to_string(path).expect("Failed to read config file");
-
-        toml::from_str(&shipper_config).expect("Failed to parse config file")
-    }
-
     /// Create a new Shipper instance with a background worker
     /// - Creates a small channel, spawns the background worker(`run_worker`) with receiving end,
     /// returns `Shipper` with the sending side. Ensuring each Shipper runs its own async loop in the
