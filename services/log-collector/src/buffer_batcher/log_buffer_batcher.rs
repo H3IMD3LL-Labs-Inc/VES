@@ -29,7 +29,7 @@ struct BufferConfig {
 }
 
 /// In-Memory Buffer (runtime structure)
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct InMemoryBuffer {
     pub queue: VecDeque<NormalizedLog>,
     pub buffer_capacity: u64,
@@ -169,151 +169,78 @@ impl InMemoryBuffer {
         Ok(())
     }
 
-    /// Flush a `NormalizedLog` batch to SQLite if persistence is enabled,
-    /// while clearing the InMemoryBuffer of the flushed logs, to prevent
-    /// unnecessary duplication overhead.
+    /// Flush a `NormalizedLog` batch to an SQLite database(if persistence is enabled), while
+    /// clearing the InMemoryBuffer of the flushed logs, to prevent unnecessary `NormalizedLog`
+    /// duplication.
     ///
-    /// [Coming Soon]: Flush logs to SQLite persistence without clearing
-    /// InMemoryBuffer, to enable fast lookup by the `Shipper`, without requiring calls
-    /// SQLite persistence.
-    pub async fn flush(&mut self, log: NormalizedLog) -> Result<()> {
-        match self.flush_policy.as_str() {
-            "batch_size" => {
-                if self.queue.len() >= self.batch_size {
-                    match &mut self.durability {
-                        Durability::SQLite(conn) => {
-                            let batch_logs: Vec<NormalizedLog> = self.queue
-                                .iter()
-                                .take(self.batch_size)
-                                .cloned()
-                                .collect();
+    /// Returns flushed `NormalizedLog` batch after flush is triggered.
+    pub async fn flush(&mut self, log: NormalizedLog) -> Result<Option<Vec<NormalizedLog>>> {
+        // Variables to store user configured flush triggers
+        let flush_by_batch_size = self.queue.len() >= self.batch_size;
+        let flush_by_batch_timeout_ms = Instant::now().duration_since(self.last_flush_at) > Duration::from_millis(self.batch_timeout_ms);
 
-                            for log in batch_logs {
-                                conn.execute(
-                                    "INSERT INTO normalized_logs (timestamp, level, message, metadata, raw_line) VALUES (?1, ?2, ?3, ?4, ?5)",
-                                    params![
-                                        log.timestamp.to_rfc3339(),
-                                        log.level,
-                                        log.message,
-                                        log.metadata.as_ref().map(|m| serde_json::to_string(m).unwrap()),
-                                        log.raw_line
-                                    ],
-                                )?;
-                            }
-                            self.last_flush_at = Instant::now();
-
-                            self.drain();
-                        }
-                        Durability::InMemory => {
-                            eprintln!("InMemoryBuffer durability configured to `in-memory` logs are currently not flushed to SQLite persistent storage");
-                        }
-                    }
-                }
-
-                Ok(())
-            }
-            "batch_timeout" => {
-                if Instant::now().duration_since(self.last_flush_at) > Duration::from_millis(self.batch_timeout_ms) {
-                    match &mut self.durability {
-                        Durability::SQLite(conn) => {
-
-                            let batch_logs: Vec<NormalizedLog> = self.queue
-                                .iter()
-                                .take(self.queue.len())
-                                .cloned()
-                                .collect();
-
-                            for log in batch_logs {
-                                conn.execute(
-                                    "INSERT INTO normalized_logs (timestamp, level, message, metadata, raw_line) VALUES (?1, ?2, ?3, ?4, ?5)",
-                                    params![
-                                        log.timestamp.to_rfc3339(),
-                                        log.level,
-                                        log.message,
-                                        log.metadata.as_ref().map(|m| serde_json::to_string(m).unwrap()),
-                                        log.raw_line,
-                                    ],
-                                )?;
-                            }
-                            self.last_flush_at = Instant::now();
-
-                            self.drain();
-                        }
-                        Durability::InMemory => {
-                            eprintln!("InMemoryBuffer durability configured to `in-memory` logs are currently not flushed to SQLite persistent storage");
-                        }
-                    }
-                }
-
-                Ok(())
-            }
-            "hybrid_size_timeout" => {
-                if self.queue.len() >= self.batch_size {
-                    match &mut self.durability {
-                        Durability::SQLite(conn) => {
-                            let batch_logs: Vec<NormalizedLog> = self.queue
-                                .iter()
-                                .take(self.batch_size)
-                                .cloned()
-                                .collect();
-
-                            for log in batch_logs {
-                                conn.execute(
-                                    "INSERT INTO normalized_logs (timestamp, level, message, metadata, raw_line) VALUES (?1, ?2, ?3, ?4, ?5)",
-                                    params![
-                                        log.timestamp.to_rfc3339(),
-                                        log.level,
-                                        log.message,
-                                        log.metadata.as_ref().map(|m| serde_json::to_string(m).unwrap()),
-                                        log.raw_line
-                                    ],
-                                )?;
-                            }
-                            self.last_flush_at = Instant::now();
-
-                            self.drain();
-                        }
-                        Durability::InMemory => {
-                            eprintln!("InMemoryBuffer durability configured to `in-memory`, logs are currently not being persisted to SQLite");
-                        }
-                    }
-                }
-                if Instant::now().duration_since(self.last_flush_at) > Duration::from_millis(self.batch_timeout_ms) {
-                    match &mut self.durability {
-                        Durability::SQLite(conn) => {
-                            let batch_logs: Vec<NormalizedLog> = self.queue
-                                .iter()
-                                .take(self.queue.len())
-                                .cloned()
-                                .collect();
-
-                            for log in batch_logs {
-                                conn.execute(
-                                    "INSERT INTO normalized_logs (timestamp, level, message, metadata, raw_line) VALUES (?1, ?2, ?3, ?4, ?5)",
-                                    params![
-                                        log.timestamp.to_rfc3339(),
-                                        log.level,
-                                        log.message,
-                                        log.metadata.as_ref().map(|m| serde_json::to_string(m).unwrap()),
-                                        log.raw_line,
-                                    ],
-                                )?;
-                            }
-                            self.last_flush_at = Instant::now();
-
-                            self.drain();
-                        }
-                        Durability::InMemory => {
-                            eprintln!("InMemoryBuffer durability configured to `in-memory`, logs are currently not being persisted to SQLite")
-                        }
-                    }
-                }
-
-                Ok(())
-            }
+        // Determine if flushing based on policy
+        let should_flush = match self.flush_policy.as_str() {
+            "batch_size" => flush_by_batch_size,
+            "batch_timeout" => flush_by_batch_timeout_ms,
+            "hybrid_size_timeout" => flush_by_batch_size || flush_by_batch_timeout_ms,
             other => {
-                eprintln!("No correct flush_policy configured. {} is not a flush_policy option", other);
-                Ok(())
+                eprintln!(
+                    "No correct flush_policy configured. '{}' is not a flush_policy option",
+                    other
+                );
+                false
+            }
+        };
+
+        if !should_flush {
+            return Ok(None); // Nothing to flush
+        }
+
+        // Determine how many logs to flush
+        let flush_count = if self.flush_policy == "batch_size" || self.flush_policy == "hybrid_size_timeout" {
+            self.batch_size.min(self.queue.len())
+        } else {
+            self.queue.len()
+        };
+
+        // Collect the logs being flushed
+        let log_batch: Vec<NormalizedLog> = self.queue
+            .iter()
+            .take(flush_count)
+            .cloned()
+            .collect();
+
+        // Perform actual flush based on configured durability
+        match &mut self.durability {
+            Durability::SQLite(conn) => {
+                for log in &log_batch {
+                    conn.execute(
+                        "INSERT INTO normalized_logs (timestamp, level, message, metadata, raw_line)
+                        VALUES (?1, ?2, ?3, ?4, ?5)",
+                        params![
+                            log.timestamp.to_rfc3339(),
+                            log.level,
+                            log.message,
+                            log.metadata.as_ref().map(|m| serde_json::to_string(m).unwrap()),
+                            log.raw_line
+                        ],
+                    )?;
+                }
+
+                // Update state after successful persistence to SQLite
+                self.queue.drain(..flush_count);
+                self.last_flush_at = Instant::now();
+                Ok(Some(log_batch))
+            }
+            Durability::InMemory => {
+                // No SQLite persistence configured, drain and return
+                self.queue.drain(..flush_count);
+                self.last_flush_at = Instant::now();
+                eprintln!(
+                    "Durability set to `InMemory`: returning flushed logs without persistence to SQLite."
+                );
+                Ok(Some(log_batch))
             }
         }
     }
