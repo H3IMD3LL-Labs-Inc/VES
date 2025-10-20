@@ -157,5 +157,3 @@ impl log_collector_server::LogCollector for LogCollectorService {
         ))
     }
 }
-
-// How are we handling configuration file loading, for each module's user configs?
