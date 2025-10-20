@@ -16,3 +16,9 @@ message NormalizedLog {
   optional Metadata metadata = 4;
   string raw_line = 5;
 }
+
+message RawLog {
+  google.protobuf.Timestamp timestamp = 1;
+  string source = 2;
+  string raw_line = 3;
+}
