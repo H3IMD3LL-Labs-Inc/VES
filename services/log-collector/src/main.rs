@@ -34,11 +34,8 @@ async fn main() -> anyhow::Result<()> {
     let buffer = InMemoryBuffer::new(&cfg.buffer).await;
     let shipper = Shipper::new(&cfg.shipper).await;
     let parser = Default::default(); // TODO: replace with configurable Parser
-    // TODO: Add watcher configurations
-    // TODO: Add parser configurations
 
     // Create shared LogCollectorService instance
-    println!("🏗️ Building gRPC server...");
     let service = Arc::new(LogCollectorService {
         parser,
         buffer_batcher: buffer,
