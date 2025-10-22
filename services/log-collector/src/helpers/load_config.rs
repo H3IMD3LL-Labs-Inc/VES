@@ -4,7 +4,14 @@ use std::fs;
 use std::path::Path;
 
 #[derive(Debug, Deserialize, Clone)]
+pub struct GeneralConfig {
+    pub enable_local_mode: bool,
+    pub enable_network_mode: bool,
+}
+
+#[derive(Debug, Deserialize, Clone)]
 pub struct Config {
+    pub general: GeneralConfig,
     pub buffer: BufferConfig,
     pub shipper: ShipperConfig,
     pub parser: ParserConfig,
