@@ -1,3 +1,15 @@
+[general]
+enable_local_mode = true
+enable_network_mode = true
+
+[watcher]
+checkpoint_path = "/path/to/checkpoint.json"
+log_dir = "/var/log/containers"
+pod_log_dir = "/var/log/pods"
+poll_interval_ms = 5000
+
+[parser]
+
 [buffer]
 capacity_option = "unbounded"                               # Options: bounded, unbounded
 buffer_capacity = 10000
@@ -20,11 +32,3 @@ send_timeout_ms = 3000                                      # Max timeout to pus
 response_timeout_ms = 10000                                 # Max timeout to wait for a response from Embedding Service, before declaring stream unhealthy
 metrics_enabled = true                                      # Boolean whether or not to expose service metrics; queue length, retry counts, etc.
 log_level = "info"                                          # Verbosity of exposed Shipper logs
-
-[watcher]
-
-
-[filter]
-
-
-[parser]
