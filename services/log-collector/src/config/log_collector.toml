@@ -3,10 +3,12 @@ enable_local_mode = true
 enable_network_mode = true
 
 [watcher]
+enabled = true
 checkpoint_path = "/path/to/checkpoint.json"
 log_dir = "/var/log/containers"
 pod_log_dir = "/var/log/pods"
 poll_interval_ms = 5000
+recursive = false
 
 [parser]
 
