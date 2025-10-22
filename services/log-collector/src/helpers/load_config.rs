@@ -8,7 +8,7 @@ pub struct Config {
     pub buffer: BufferConfig,
     pub shipper: ShipperConfig,
     pub parser: ParserConfig,
-    pub watcher: WatcherConfig,
+    pub watcher: Option<WatcherConfig>,
 }
 
 impl Config {
@@ -56,7 +56,11 @@ pub struct ShipperConfig {
 
 #[derive(Debug, Deserialize, Clone)]
 pub struct WatcherConfig {
-    // TODO: Add watcher configuration fields
+    pub enabled: bool,
+    pub log_dir: String,
+    pub checkpoint_path: String,
+    pub poll_interval_ms: Option<u64>,
+    pub recursive: Option<bool>,
 }
 
 #[derive(Debug, Deserialize, Clone)]
