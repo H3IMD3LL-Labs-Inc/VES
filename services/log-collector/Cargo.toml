@@ -23,3 +23,9 @@ config.workspace = true
 
 [build-dependencies]
 tonic-prost-build = "0.14.2"
+
+[profile.dev]
+opt-level = 0
+
+[profile.release]
+opt-level = 3
