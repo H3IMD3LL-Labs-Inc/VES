@@ -12,6 +12,8 @@ mod tailer;
 mod watcher;
 
 use anyhow::Result;
+use std::path::PathBuf;
+use std::sync::Arc;
 use tonic::transport::Server;
 
 use crate::buffer_batcher::log_buffer_batcher::InMemoryBuffer;
@@ -19,6 +21,7 @@ use crate::helpers::load_config::Config;
 use crate::proto::collector::log_collector_server::LogCollectorServer;
 use crate::server::server::LogCollectorService;
 use crate::shipper::shipper::Shipper;
+use crate::watcher::watcher::LogWatcher;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -30,26 +33,58 @@ async fn main() -> anyhow::Result<()> {
     println!("🤖 Initializing Log Collector....");
     let buffer = InMemoryBuffer::new(&cfg.buffer).await;
     let shipper = Shipper::new(&cfg.shipper).await;
+    let parser = Default::default(); // TODO: replace with configurable Parser
     // TODO: Add watcher configurations
     // TODO: Add parser configurations
 
     // Create shared LogCollectorService instance
     println!("🏗️ Building gRPC server...");
-    let service = LogCollectorService {
-        parser: Default::default(),
+    let service = Arc::new(LogCollectorService {
+        parser,
         buffer_batcher: buffer,
         shipper,
-    };
+    });
 
-    // TODO: Spawn Local Watcher (optional)
-    // watcher.rs/tailer.rs -> parser.rs -> log_buffer_batcher.rs -> shipper.rs
+    // Spawn Local Watcher (optional)
+    if cfg.general.enable_local_mode {
+        if let Some(wcfg) = &cfg.watcher {
+            if wcfg.enabled {
+                println!("📂 Starting local file watcher on: {}", wcfg.log_dir);
+                let log_dir = PathBuf::from(&wcfg.log_dir);
+                let checkpoint_path = PathBuf::from(&wcfg.checkpoint_path);
 
-    // Starts gRPC server (optional)
-    println!("🚀 Starting gRPC server on [::1]:50082");
-    Server::builder()
-        .add_service(LogCollectorServer::new(service))
-        .serve("[::1]:50052".parse()?)
-        .await?;
+                // Clone the Arc so watcher shares the internal components with `network_mode`
+                let service_clone = Arc::clone(service);
 
-    Ok(())
+                tokio::spawn(async move {
+                    match LogWatcher::new_watcher(log_dir, checkpoint_path).await {
+                        Ok(mut watcher) => {
+                            if let Err(e) = watcher.run_watcher().await {
+                                eprintln!("Watcher error: {e}");
+                            }
+                        }
+                        Err(e) => eprintln!("Failed to start watcher: {e}"),
+                    }
+                });
+            } else {
+                println!("Local log watcher disabled in [watcher] config.");
+            }
+        } else {
+            println!("No watcher config found in config file, skipping local mode.");
+        }
+    } else {
+        println!("Local mode disabled in [general] config.")
+    }
+
+    // Start gRPC server (optional)
+    if cfg.general.enable_network_mode {
+        println!("🌐 Starting gRPC server on [::1]:50052");
+
+        Server::builder()
+            .add_service(LogCollectorServer::new((*service).clone()))
+            .serve("[::1]:50052".parse()?)
+            .await?;
+    } else {
+        println!("🌐 Network mode disabled in [general] config.");
+    }
 }
