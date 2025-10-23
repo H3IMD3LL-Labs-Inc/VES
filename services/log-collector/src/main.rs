@@ -51,11 +51,22 @@ async fn main() -> anyhow::Result<()> {
                 let checkpoint_path = PathBuf::from(&wcfg.checkpoint_path);
 
                 // Clone the Arc so watcher shares the internal components with `network_mode`
-                let service_clone = Arc::clone(service);
+                let shared_service = Arc::clone(service);
 
                 tokio::spawn(async move {
-                    match LogWatcher::new_watcher(log_dir, checkpoint_path).await {
+                    // Builder function — creates and configures LogWatcher before it starts doing
+                    // any work. Takes all parameters controlling how it behaves at runtime.
+                    match LogWatcher::new_watcher(
+                        log_dir,
+                        checkpoint_path,
+                        shared_service,
+                        wcfg.poll_interval_ms,
+                        wcfg.recursive,
+                    )
+                    .await
+                    {
                         Ok(mut watcher) => {
+                            // Runtime function — run LogWatcher with parameters controlling how it behaves at runtime
                             if let Err(e) = watcher.run_watcher().await {
                                 eprintln!("Watcher error: {e}");
                             }
