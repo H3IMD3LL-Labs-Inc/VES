@@ -44,12 +44,12 @@ impl Tailer {
         &mut self,
         mut shutdown_rx: tokio::sync::watch::Receiver<bool>,
     ) -> Result<()> {
-        // 1. Get access to the file handle (from self or the BufReader returned by new_tailer())
+        // Get access to the file handle (from self or the BufReader returned by new_tailer())
         let reader = self.reader.as_mut().expect("Tailer not initialized!");
 
         let mut line = String::new();
 
-        // 2. Enter infinite loop to actually run a Tailer
+        // Enter infinite loop to actually run a Tailer
         loop {
             tokio::select! {
                 bytes = reader.read_line(&mut line) => {
@@ -57,7 +57,7 @@ impl Tailer {
                     if bytes == 0 {
                         sleep(Duration::from_millis(100)).await;
                     } else {
-                        // Process line...
+                        // TODO: Process line...maybe send to shared pipeline
                     }
                 }
                 _ = shutdown_rx.changed() => {
