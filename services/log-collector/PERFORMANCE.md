@@ -76,10 +76,10 @@ rustflags = ["-C", "target-cpu=native", "-C", "prefer-dynamic"]
 use tokio::runtime::Builder;
 
 let rt = Builder::new_multi_thread()
-    .worker_threads(4)             // match number of logical cores for this role
-    .thread_name("ves-lowlatency")
-    .enable_all()
-    .max_blocking_threads(1)
+    .worker_threads(4)                  // match number of logical cores for this role
+    .thread_name("ves-lowlatency")      // helpful for debugging & profiling
+    .enable_all()                       // enables IO, time, etc.
+    .max_blocking_threads(1)            // limit blocking pool size
     .build()
     .unwrap();
 
@@ -87,13 +87,16 @@ rt.block_on(async {
     // run tonic server / latency-critical tasks here
 });
 ```
-- Guidelines & rationale;
-  - `worker_threads`: pick <= number of physical cores in the NUMA node; avoid oversubscription.
-  - `max_blocking_threads`: keep minimal; offload heavy blocking tasks to separate pool.
-  - Use separate runtime for metrics/logging where you can accept higher latency.
-- Avoid `.await` inside locks — restructure critical sections to short synchronous grabs (see Section 8).
-- Prefer `tokio::task::spawn` for background tasks that are not latency-critical; keep hot I/O on the dedicated runtime.
+- Guidelines;
+  - `new_multi_thread()`: -> Creates a multi-threaded runtime, which is needed for concurrent async tasks and high I/O.
+  - `worker_threads()`: -> Number of worker threads(event loop executors), should be matched to number of physical cores on the machine running this service. Oversubscribing = thread contention and unpredictable latency.
+  - `thread_name()`: -> Sets thread names, which makes tracing and profiling readable.
+  - `enable_all()`: -> Enables IO, time, and signal drivers, which is needed for networking and async timers.
+  - `max_blocking_threads()`: -> Number of blocking threads, this reduces scheduler jitter; prevents blocking calls (like file I/O) from interfering with hot async path.
+  - `block_on()`: -> Runs async tasks inside the runtime, ensuring low latency critical code stays isolated from global background tasks.
 
+- Rationals;
+  -
 ---
 
 ### 5) gRPC (Tonic) transport tuning — server & client
