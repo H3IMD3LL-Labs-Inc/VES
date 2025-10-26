@@ -1,36 +1,3 @@
-/// ================================================================================================================
-///
-///         THE FOLLOWING STILL HAS NOT BEEN IMPLEMENTED, BE ADVISED WHILE USING AND WORKING ON THIS MODULE
-///
-/// ================================================================================================================
-///
-/// 1. No shutdown/cleanup for spawned Tailers
-///    - Once a tailer is started, it runs indefinitely. If log files rotate heavily this
-///      could spawn too many tasks
-///
-/// 2. Checkpoint recovery is stubbed out
-///    - `load_checkpoint()` reads but does not actually restor offsets into running `Tailers` yet.
-///
-/// 3. Backpressure and Error handling
-///    - If log volume is very high, `tx.blocking_send(event)` could clog the channel
-///    - No retry/recovery strategy on checkpoint save failures.
-///
-/// 4. Concurrency Issues
-///    - `handle_new_file()` awaits `tailer.new_tailer().await` inline, blocking the watcher loop
-///      , while `discover_initial_files()` uses `tokio::spawn`. This inconsistency might cause the
-///      watcher to "stall" while running if a tailer blocks.
-///
-/// 5. Cross-platform limitations
-///    - Hardcoded to Unix/Unix-like OS. Currently won't run on windows without modification
-///
-/// 6. Configs are hardcoded
-///    - Paths like `/var/log/containers` and `/path/to/checkpoint.json` are not configurable yet.
-///      This was by design as I built the system to monitor Kubernetes/CRI format logs in my Kubernetes
-///      personal projects.
-///
-/// - DennisN22042003(GitHub)
-///
-/// ===============================================================================================================
 use anyhow::Result;
 use notify::{Event, RecommendedWatcher, RecursiveMode, Watcher};
 use serde::{Deserialize, Serialize};
@@ -38,15 +5,11 @@ use std::collections::HashMap;
 use std::fs;
 use std::os::unix::fs::MetadataExt;
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
 use tokio_stream::StreamExt;
 
+use crate::server::server::LogCollectorService;
 use crate::tailer::tailer::Tailer;
-
-/// TODO: Handle with config.rs, maybe idk LOL :)
-const CHECKPOINT_PATH: &str = "/path/to/checkpoint.json";
-const LOG_DIR: &str = "/var/log/containers";
-const POD_LOG_DIR: &str = "/var/log/pods";
-const POLL_INTERNAL_SECS: u64 = 5; // Fallback poll interval
 
 #[derive(Debug, Serialize, Deserialize)]
 struct FileState {
@@ -62,11 +25,14 @@ struct Checkpoint {
 
 /// Main log watcher struct.
 #[derive(Debug, Serialize, Deserialize)]
-struct LogWatcher {
-    log_dir: PathBuf,
-    checkpoint_path: PathBuf,
-    checkpoint: Checkpoint,
-    active_files: HashMap<u64, PathBuf>,
+pub struct LogWatcher {
+    pub log_dir: PathBuf,
+    pub checkpoint_path: PathBuf,
+    pub checkpoint: Checkpoint,
+    pub active_files: HashMap<u64, PathBuf>,
+    pub poll_interval_ms: Option<u64>,
+    pub recursive: Option<bool>,
+    pub service: Arc<LogCollectorService>,
 }
 
 /// FileState Methods
@@ -99,6 +65,12 @@ impl Checkpoint {
     async fn load_checkpoint(&mut self, saved_file_path: &Path) -> Result<()> {
         let saved_file_path_buf = saved_file_path.to_path_buf();
 
+        // TODO: Currently this only checks whether a given file path exists in
+        // the in-memory map. This doesn't consider the following;
+        // - Missing checkpoint files on disk
+        // - Corrupted JSON
+        // - Changed inode (rotated log)
+        // - Partial/inconsistent state between memory and disk
         if self.files.contains_key(&saved_file_path_buf) {
             let contents = tokio::fs::read_to_string(&saved_file_path).await?;
 
@@ -163,7 +135,13 @@ impl Checkpoint {
 /// Log watcher struct implementation
 impl LogWatcher {
     /// Creates a new log watcher instance and loads the last checkpoint, if it exists.
-    pub async fn new_watcher(log_dir: PathBuf, checkpoint_path: PathBuf) -> Result<Self> {
+    pub async fn new_watcher(
+        log_dir: PathBuf,
+        checkpoint_path: PathBuf,
+        poll_interval_ms: Option<u64>,
+        recursive: Option<bool>,
+        service: Arc<LogCollectorService>,
+    ) -> Result<Self> {
         let mut checkpoint = Checkpoint {
             files: HashMap::new(),
         };
@@ -175,12 +153,16 @@ impl LogWatcher {
             checkpoint_path,
             checkpoint,
             active_files: HashMap::new(),
+            poll_interval_ms,
+            recursive,
+            service,
         })
     }
 
     /// Main async loop that orchestrates the watcher
     pub async fn run_watcher(&mut self) -> Result<()> {
         let (tx, rx) = tokio::sync::mpsc::channel(100);
+
         let mut watcher = RecommendedWatcher::new(
             move |res| {
                 if let Ok(event) = res {
@@ -189,9 +171,17 @@ impl LogWatcher {
             },
             notify::Config::default(),
         )?;
+
+        let mode = if self.recursive.unwrap_or(false) {
+            RecursiveMode::Recursive
+        } else {
+            RecursiveMode::NonRecursive
+        };
+
         watcher.watch(&self.log_dir, RecursiveMode::NonRecursive)?;
 
         let mut event_rx = tokio_stream::wrappers::ReceiverStream::new(rx);
+        let poll_interval = self.poll_interval_ms.unwrap_or(5000); // Incase of error default to 5000ms/5secs
 
         self.discover_initial_files().await?;
 
@@ -200,7 +190,7 @@ impl LogWatcher {
                 Some(event) = event_rx.next() => {
                     self.handle_event(event).await?;
                 }
-                _ = tokio::time::sleep(tokio::time::Duration::from_secs(POLL_INTERNAL_SECS)) => {
+                _ = tokio::time::sleep(tokio::time::Duration::from_millis(poll_interval)) => {
                     self.discover_new_files().await?;
                 }
             }
@@ -217,7 +207,7 @@ impl LogWatcher {
                     self.handle_new_file(inode, path).await?;
                 }
             }
-            // TODO: Not useable until I implement `handle_file_change()`
+            // TODO: Implement handle_file_change() to make this functional
             notify::EventKind::Modify(notify::event::ModifyKind::Data(_)) => {
                 for path in &event.paths {
                     self.handle_file_change(path).await?;
@@ -238,7 +228,18 @@ impl LogWatcher {
         Ok(())
     }
 
-    /// Discovers initial log files when a new watcher starts
+    /// Initial starting point for a new log watcher startup.
+    ///
+    /// [Purpose]: new LogWatcher Bootstrap phase. At this stage, we don't need to handle "new"
+    /// files being created, just existing ones on disk. Also expects `notify` may not have emitted
+    /// any events.
+    ///
+    /// - Scans the directory provided `log_dir` for .log files.
+    /// - Checks if any .log files in the directory are already known (using checkpoint metadata).
+    /// - Spawns an async tailer for each file.
+    /// - Persists checkpoints for any new files.
+    ///
+    /// [TODO]: Store handles to manage each new tailer created.
     async fn discover_initial_files(&mut self) -> Result<()> {
         let mut entries = tokio::fs::read_dir(&self.log_dir).await?;
 
@@ -267,26 +268,42 @@ impl LogWatcher {
                     file_path: path.clone(),
                     file_offset: offset,
                     file_handle: String::new(),
+                    reader: None,
                 };
+
                 tokio::spawn(async move {
-                    let _ = tailer.new_tailer().await;
+                    if let Err(e) = tailer.new_tailer().await {
+                        eprintln!("Failed to init tailer for {:?}: {:?}", tailer.file_path, e);
+                        return;
+                    }
+                    if let Err(e) = tailer.run_tailer(shutdown_rx).await {
+                        eprintln!("Tailer error for {:?}: {:?}", tailer.file_path, e);
+                    }
                 });
 
-                // If file is new(not in LogWatcher.checkpoint), save it
+                // If file is new(has no checkpoint), save it
                 if !self.checkpoint.files.contains_key(&path) {
                     self.checkpoint
                         .save_checkpoint(&self.checkpoint_path, path, inode, 0)
                         .await?;
                 }
+
+                // TODO: Store handle for management (optional)
+                // TODO: self.active_tailers.insert(inode, (handle, shutdown_tx));
             }
         }
 
         Ok(())
     }
 
-    /// Discovers new files that might have been missed by `notify`
+    /// Runtime Discover (discover new files after a new LogWatcher is created and running).
+    ///
+    /// [Purpose]: Periodic polling backup. Despite log files being watched with `notify`, it's
+    /// possible to miss file creation events (e.g., when the system reboots, rotated logs, or a symlink
+    /// change). This periodically scans the directory again.
+    ///
     pub async fn discover_new_files(&mut self) -> Result<()> {
-        let entries = fs::read_dir(&self.log_dir)?;
+        let entries = tokio::fs::read_dir(&self.log_dir)?;
 
         for entry in entries {
             let entry = entry?;
@@ -304,24 +321,39 @@ impl LogWatcher {
         Ok(())
     }
 
-    /// Handles newly discovered files
+    /// Adds new files when `discover_new_files()` is called.
+    ///
+    /// [Purpose]: Encapsulates the logic for adding one new file. Acting as a reusable
+    /// helper so both event-based (`notify`) and polling-based (`discover_new_files()`) systems
+    /// can use it.
+    ///
     async fn handle_new_file(&mut self, inode: u64, path: &Path) -> Result<()> {
         if self.active_files.contains_key(&inode) {
             return Ok(());
         } else {
             let new_file_path = path.clone().to_path_buf();
 
+            self.active_files.insert(inode, new_file_path);
+
             let mut tailer = Tailer {
                 file_path: new_file_path.clone(),
                 file_offset: 0,
                 file_handle: String::new(),
+                reader: None,
             };
 
-            self.active_files.insert(inode, new_file_path);
-
-            // NOTE: This currently does not have a shutdown/stop mechanism.
-            // Will run in a perpetual loop.
-            tailer.new_tailer().await;
+            tokio::spawn(async move {
+                if let Err(e) = tailer.new_tailer().await {
+                    eprintln!(
+                        "Failed to initialize tailer for {:?}: {:?}",
+                        tailer.file_path, e
+                    );
+                    return;
+                }
+                if let Err(e) = tailer.run_tailer(shutdown_rx).await {
+                    eprintln!("Tailer error for {:?}: {:?}", tailer.file_path, e);
+                }
+            });
 
             self.checkpoint
                 .save_checkpoint(&self.checkpoint_path, path.to_path_buf(), inode, 0)
