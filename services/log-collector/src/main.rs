@@ -25,12 +25,15 @@ use crate::watcher::watcher::LogWatcher;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
+    // TODO: Ensure proper tracing is added to ensure observability, monitoring and debugging.
+    // TODO: Add shutdown signal and shutdown signal propagation to ensure correct, effiecient and error-free shutdowns.
+
     // Load config
-    println!("⏳ Loading configurations....");
+    println!("Loading configurations....");
     let cfg = Config::load("log_collector.toml")?;
 
     // Initialize log collector components
-    println!("🤖 Initializing Log Collector....");
+    println!("Initializing Log Collector....");
     let buffer = InMemoryBuffer::new(&cfg.buffer).await;
     let shipper = Shipper::new(&cfg.shipper).await;
     let parser = Default::default(); // TODO: replace with configurable Parser
@@ -46,7 +49,7 @@ async fn main() -> anyhow::Result<()> {
     if cfg.general.enable_local_mode {
         if let Some(wcfg) = &cfg.watcher {
             if wcfg.enabled {
-                println!("📂 Starting local file watcher on: {}", wcfg.log_dir);
+                println!("Starting local file watcher on: {}", wcfg.log_dir);
                 let log_dir = PathBuf::from(&wcfg.log_dir);
                 let checkpoint_path = PathBuf::from(&wcfg.checkpoint_path);
 
@@ -86,13 +89,13 @@ async fn main() -> anyhow::Result<()> {
 
     // Start gRPC server (optional)
     if cfg.general.enable_network_mode {
-        println!("🌐 Starting gRPC server on [::1]:50052");
+        println!("Starting gRPC server on [::1]:50052");
 
         Server::builder()
             .add_service(LogCollectorServer::new((*service).clone()))
             .serve("[::1]:50052".parse()?)
             .await?;
     } else {
-        println!("🌐 Network mode disabled in [general] config.");
+        println!("Network mode disabled in [general] config.");
     }
 }
