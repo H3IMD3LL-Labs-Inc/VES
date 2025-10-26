@@ -58,11 +58,12 @@ impl Tailer {
                         sleep(Duration::from_millis(100)).await;
                     } else {
                         // TODO: Process line...maybe send to shared pipeline
+                        // TODO: Ensure backpressure is handled while logs are being sent to the shared pipeline; parser, buffer_batcher, shipper
                     }
                 }
                 _ = shutdown_rx.changed() => {
                     if *shutdown_rx.borrow() {
-                        println!("🛑 Tailer received shutdown signal for {:?}", self.file_path);
+                        println!("Tailer received shutdown signal for {:?}", self.file_path);
                         break;
                     }
                 }
