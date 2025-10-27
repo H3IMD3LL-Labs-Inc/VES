@@ -16,6 +16,8 @@ services:
     restart: unless-stopped
     networks:
       - observability
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
 
   alertmanager:
     image: prom/alertmanager:latest
