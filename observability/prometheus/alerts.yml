@@ -1,0 +1,64 @@
+groups:
+  - name: ves-perfromance-rules
+    interval: 10s
+    rules:
+      # High Latency Detection
+      - alert: HighTailLatency
+        expr: logcollector_p99_latency_ms > 1
+        for: 30s
+        labels:
+          severity: warning
+          category: performance
+        annotations:
+          summary: "VES Log Collector high p99 latency"
+          description: "p99 latency has exceeded 1ms for over 30s."
+
+      # Low Throughput
+      - alert: LowThroughput
+        expr: logcollector_throughput_logs_per_sec < 1000000
+        for: 30s
+        labels:
+          severity: warning
+          category: performance
+        annotations:
+          summary: "VES Log Collector throughput drop"
+          description: "Throughput has fallen below 1M logs/sec."
+
+      # High CPU Usage
+      - alert: HighCPUUsage
+        expr: (100 - (avg by (instance) (irate(node_cpu_seconds_total{mode="idle"}[1m])) * 100)) > 80
+        for: 1m
+        labels:
+          severity: critical
+          category: system
+        annotations:
+          summary: "High CPU usage"
+          description: "Node CPU utilization >80% for more than 1 minute."
+
+      # High Memory Usage
+      - alert: HighMemoryUsage
+        expr: (node_memory_Active_bytes / node_memory_MemTotal_bytes) * 100 > 85
+        for: 1m
+        labels:
+          severity: critical
+          category: system
+        annotations:
+          summary: "High memory usage"
+          description: "Node memory usage >85% for over 1 minute."
+
+      # VES Log Collector Down
+      - alert: LogCollectorDown
+        expr: up{job="ves-logcollector"} == 0
+        for: 10s
+        labels:
+          severity: critical
+          category: availability
+        annotations:
+          summary: "VES Log Collector is unreachable."
+          description: "Prometheus failed to scrap the /metrics endpoint."
+
+      # TODO: logcollector_queue_size
+      # TODO: logcollector_dropped_logs_total
+      # TODO: logcollector_flush_duration_ms
+      # TODO: logcollector_active_threads
+      # TODO: logcollector_batch_size

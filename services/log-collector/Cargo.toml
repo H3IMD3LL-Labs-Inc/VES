@@ -28,4 +28,9 @@ tonic-prost-build = "0.14.2"
 opt-level = 0
 
 [profile.release]
-opt-level = 3
+opt-level = 3               # maximize optimization for speed
+lto = true                  # link-time optimization
+codegen-units = 1           # enable more optimization opportunities
+debug = false
+panic = "abort"
+overflow-checks = false

@@ -1,0 +1,46 @@
+{
+  "title": "VES Log Collector Performance",
+  "uid": "ves-logcollecor-perf",
+  "panels": [
+    {
+      "type": "timeseries",
+      "title": "Throughput (logs/sec)",
+      "target": [
+        {
+          "expr": "logcollector_throughput_logs_per_sec",
+          "legendFormat": "{{instance}}"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "p99 Latency (ms)",
+      "targets": [
+        {
+          "expr": "logcollector_p99_latency_ms",
+          "legendFormat": "{{instance}}"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "CPU Usage (%)",
+      "targets": [
+        {
+          "expr": "100 - (avg by (instance) (irate(node_cpu_seconds_total{mode=\"idle\"}[1m])) * 100)"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Memory Usage (%)",
+      "targets": [
+        {
+          "expr": "(node_memory_Active_bytes / node_memory_MemTotal_bytes) * 100"
+        }
+      ]
+    }
+  ],
+  "schemaVersion": 37,
+  "version": 1
+}
