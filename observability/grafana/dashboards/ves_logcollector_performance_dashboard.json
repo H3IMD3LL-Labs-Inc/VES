@@ -7,7 +7,7 @@
       "title": "Throughput (logs/sec)",
       "target": [
         {
-          "expr": "Logcollector_throughput_logs_per_sec",
+          "expr": "logcollector_throughput_logs_per_sec",
           "legendFormat": "{{instance}}"
         }
       ]
@@ -17,7 +17,7 @@
       "title": "p99 Latency (ms)",
       "targets": [
         {
-          "expr": "Logcollector_p99_latency_ms",
+          "expr": "logcollector_p99_latency_ms",
           "legendFormat": "{{instance}}"
         }
       ]
@@ -42,5 +42,5 @@
     }
   ],
   "schemaVersion": 37,
-  "version":
+  "version": 1
 }

@@ -56,3 +56,9 @@ groups:
         annotations:
           summary: "VES Log Collector is unreachable."
           description: "Prometheus failed to scrap the /metrics endpoint."
+
+      # TODO: logcollector_queue_size
+      # TODO: logcollector_dropped_logs_total
+      # TODO: logcollector_flush_duration_ms
+      # TODO: logcollector_active_threads
+      # TODO: logcollector_batch_size
