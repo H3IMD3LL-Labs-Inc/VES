@@ -20,6 +20,11 @@ tonic-prost.workspace = true
 rand.workspace = true
 thiserror.workspace = true
 config.workspace = true
+hyper.workspace = true
+http-body-util.workspace = true
+hyper-util.workspace = true
+prometheus.workspace = true
+lazy_static.workspace = true
 
 [build-dependencies]
 tonic-prost-build = "0.14.2"

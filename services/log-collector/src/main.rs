@@ -3,6 +3,7 @@ mod control_observability;
 mod filter_redactor;
 mod helpers;
 mod metadata_enricher;
+mod metrics;
 mod models;
 mod parser;
 mod proto;
