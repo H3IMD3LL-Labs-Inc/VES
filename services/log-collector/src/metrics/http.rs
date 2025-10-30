@@ -1,8 +1,3 @@
-// Listen on port 9000
-// Respond to GET /metrics
-// Return Log Collector metrics
-// Return 404 for anything else
-
 use hyper::{
     Body, Method, Request, Response, Server,
     service::{make_service_fn, service_fn},
