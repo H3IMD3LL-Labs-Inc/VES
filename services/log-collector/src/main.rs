@@ -29,6 +29,11 @@ async fn main() -> anyhow::Result<()> {
     // TODO: Ensure proper tracing is added to ensure observability, monitoring and debugging.
     // TODO: Add shutdown signal and shutdown signal propagation to ensure correct, effiecient and error-free shutdowns.
 
+    // Start metrics HTTP server
+    tokio::spawn(async {
+        metrics::http::start_metrics_server("0.0.0.0:9000").await;
+    });
+
     // Load config
     println!("Loading configurations....");
     let cfg = Config::load("log_collector.toml")?;
