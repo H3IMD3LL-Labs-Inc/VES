@@ -1,14 +1,14 @@
-use crate::parser::parser::NormalizedLog;
 use crate::helpers::load_config::BufferConfig;
+use crate::parser::parser::NormalizedLog;
 use rusqlite::{Connection, Result, params};
 use serde::Deserialize;
-use tokio::time::Instant;
 use std::collections::VecDeque;
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::fs;
-use tokio::task;
 use tokio::sync::Notify;
+use tokio::task;
+use tokio::time::Instant;
 
 /// In-Memory Buffer (runtime structure)
 #[derive(Debug, Clone)]
@@ -145,7 +145,8 @@ impl InMemoryBuffer {
     pub async fn flush(&mut self, log: NormalizedLog) -> Result<Option<Vec<NormalizedLog>>> {
         // Variables to store user configured flush triggers
         let flush_by_batch_size = self.queue.len() >= self.batch_size;
-        let flush_by_batch_timeout_ms = Instant::now().duration_since(self.last_flush_at) > Duration::from_millis(self.batch_timeout_ms);
+        let flush_by_batch_timeout_ms = Instant::now().duration_since(self.last_flush_at)
+            > Duration::from_millis(self.batch_timeout_ms);
 
         // Determine if flushing based on policy
         let should_flush = match self.flush_policy.as_str() {
@@ -166,18 +167,15 @@ impl InMemoryBuffer {
         }
 
         // Determine how many logs to flush
-        let flush_count = if self.flush_policy == "batch_size" || self.flush_policy == "hybrid_size_timeout" {
-            self.batch_size.min(self.queue.len())
-        } else {
-            self.queue.len()
-        };
+        let flush_count =
+            if self.flush_policy == "batch_size" || self.flush_policy == "hybrid_size_timeout" {
+                self.batch_size.min(self.queue.len())
+            } else {
+                self.queue.len()
+            };
 
         // Collect the logs being flushed
-        let log_batch: Vec<NormalizedLog> = self.queue
-            .iter()
-            .take(flush_count)
-            .cloned()
-            .collect();
+        let log_batch: Vec<NormalizedLog> = self.queue.iter().take(flush_count).cloned().collect();
 
         // Perform actual flush based on configured durability
         match &mut self.durability {
@@ -236,13 +234,18 @@ impl InMemoryBuffer {
                 Ok(())
             }
             "drain_batch_timeout" => {
-                if Instant::now().duration_since(self.last_flush_at) > Duration::from_millis(self.batch_timeout_ms) {
+                if Instant::now().duration_since(self.last_flush_at)
+                    > Duration::from_millis(self.batch_timeout_ms)
+                {
                     self.queue.drain(..self.queue.len());
                 }
                 Ok(())
             }
             other => {
-                eprintln!("No correct drain_policy configured. {} is not a drain_policy option", other);
+                eprintln!(
+                    "No correct drain_policy configured. {} is not a drain_policy option",
+                    other
+                );
                 Ok(())
             }
         }
@@ -272,7 +275,9 @@ impl InMemoryBuffer {
             }
             "grow_capacity" => {
                 self.queue.reserve(1);
-                eprintln!("buffer_capacity exceeded, capacity extended without memory re-allocation")
+                eprintln!(
+                    "buffer_capacity exceeded, capacity extended without memory re-allocation"
+                );
                 Ok(true)
             }
             other => {
