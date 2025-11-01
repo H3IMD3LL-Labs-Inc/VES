@@ -1,4 +1,5 @@
 use crate::buffer_batcher::log_buffer_batcher::InMemoryBuffer;
+use crate::helpers::log_processing::process_log_line;
 use crate::parser::parser::NormalizedLog;
 use crate::proto::collector::log_collector_server::LogCollector;
 use crate::proto::common::{CollectResponse, RawLog};
@@ -52,88 +53,35 @@ impl log_collector_server::LogCollector for LogCollectorService {
         // Create a channel to send CollectResponses back to the client calling the Log Collector
         let (tx, rx) = mpsc::channel(32);
 
-        // Clone references to modules(actual log collector logic) used by the Log Collector since self is &self
+        // Cloned references to modules(actual log collector logic) used by the Log Collector since self is &self
         let log_parser = self.parser.clone();
         let log_buffer_batcher = self.buffer_batcher.clone();
         let log_shipper = self.shipper.clone();
 
         // Spawn a background task to handle the incoming stream of logs
         tokio::spawn(async move {
-            while let Some(raw_log_message) = inbound_log_stream.next().await {
-                match raw_log_message {
+            let mut inbound_logs = inbound_log_stream;
+            while let Some(raw_log_result) = inbound_logs.next().await {
+                match raw_log_result {
                     Ok(raw_log) => {
                         let line = raw_log.line;
 
-                        // Parse into NormalizedLog format
-                        match NormalizedLog::select_parser(&line).await {
-                            Ok(parsed_log) => {
-                                // Add NormalizedLog to InMemoryBuffer
-                                // Incoming RawLogs sit in-memory, until either; configured batch_size or batch_timeout_ms has elapsed
-                                if let Err(e) = log_buffer_batcher.push(parsed_log).await {
-                                    eprintln!("InMemoryBuffer error: {e}");
-                                    let _ = tx
-                                        .send(Ok(CollectRespnse {
-                                            status: format!("in memory buffer error: {e}"),
-                                        }))
-                                        .await;
-                                    continue;
-                                }
-
-                                // Attempt to flush InMemoryBuffer NormalizedLogs to SQLite
-                                // when either batch_size, batch_timeout_ms or both is hit
-                                // If running with durability, in-memory logs are written to disk (SQLite database),
-                                // then cleared from in-memory queue. If not running with durability RawLogs just remain
-                                // in-memory (RAM).
-                                //
-                                // The logs are "safe", they're either persisted (SQLite) or buffered in-memory
-                                if log_buffer_batcher.queue.len() >= log_buffer_batcher.batch_size
-                                    || log_buffer_batcher.last_flush_at.elapsed().as_millis()
-                                        >= log_buffer_batcher.batch_timeout_ms as u128
-                                {
-                                    match log_buffer_batcher.flush(parsed_log.clone()).await {
-                                        Ok(Some(flushed_logs)) => {
-                                            // pass flushed logs batch to shipper
-                                            if let Err(e) =
-                                                log_shipper.send(flushed_logs.clone()).await
-                                            {
-                                                eprintln!("Shipper error: {e}");
-                                                let _ = tx
-                                                    .send(Ok(CollectResponse {
-                                                        status: format!("shipper error: {e}"),
-                                                    }))
-                                                    .await;
-                                                continue;
-                                            }
-
-                                            // Send ACK back to client
-                                            let _ = tx
-                                                .send(Ok(CollectResponse {
-                                                    status: format!(
-                                                        "Flushed {} logs successfully and sent to Shipper",
-                                                        flushed_logs.len()
-                                                    ),
-                                                }))
-                                                .await;
-                                        }
-                                        Ok(None) => continue,
-
-                                        Err(e) => {
-                                            eprintln!("Buffer flush error: {e}");
-                                            let _ = tx
-                                                .send(Ok(CollectResponse {
-                                                    status: format!("flush error: {e}"),
-                                                }))
-                                                .await;
-                                            continue;
-                                        }
-                                    }
-                                }
+                        match process_log_line(
+                            &log_parser,
+                            &log_buffer_batcher,
+                            &log_shipper,
+                            line.clone(),
+                        )
+                        .await
+                        {
+                            Ok(status) => {
+                                let _ = tx.send(Ok(CollectResponse { status })).await;
                             }
-                            Err(err) => {
-                                eprintln!("Failed to parse log: {}", err);
+                            Err(e) => {
+                                eprintln!("Log processing error: {}", e);
                                 let _ = tx
                                     .send(Ok(CollectResponse {
-                                        status: format!("error: {}", err),
+                                        status: format!("Error: {}", e),
                                     }))
                                     .await;
                             }
@@ -143,7 +91,7 @@ impl log_collector_server::LogCollector for LogCollectorService {
                         eprintln!("Error receiving log: {}", e);
                         let _ = tx
                             .send(Ok(CollectResponse {
-                                status: format!("stream error: {}", e),
+                                status: format!("Stream error: {}", e),
                             }))
                             .await;
                     }

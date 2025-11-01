@@ -96,7 +96,7 @@ impl Shipper {
     }
 }
 
-/// Backgground worker loog (owns the outbound gRPC stream).
+/// Backgground worker loop (owns the outbound gRPC stream).
 ///
 /// High level algorithm:
 /// 1. Repeatedly attempt to connect to the Embedder using `connect_with_retry`.

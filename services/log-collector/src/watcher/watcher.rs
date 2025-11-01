@@ -32,6 +32,20 @@ pub struct LogWatcher {
     pub active_files: HashMap<u64, PathBuf>,
     pub poll_interval_ms: Option<u64>,
     pub recursive: Option<bool>,
+
+    // `LogWatcher` itself doesn't directly call methods on `LogCollectorService`.
+    // Instead, it acts as the *factory and supervisor* for `Tailer` instances.
+    //
+    // It holds an `Arc<LogCollectorService>` so that every Tailer it spawns can
+    // share access to the same underlying pipeline — parser, buffer-batcher, shipper.
+    //
+    // This allows to wire local mode components together once in `main()`, then passing
+    // the wiring down through the system so that every concurrent Tailer uses the same
+    // core processing and shipping pipeline without duplication.
+    //
+    // `LogWatcher` mainly still maintains its role of local log file watching and Tailer
+    // orchestration. It's not supposed to do any actual processing. This is left to the
+    // Tailer which uses an `Arc<LogCollectorService>` to actual implement the processing.
     pub service: Arc<LogCollectorService>,
 }
 
@@ -269,6 +283,7 @@ impl LogWatcher {
                     file_offset: offset,
                     file_handle: String::new(),
                     reader: None,
+                    service: Arc::clone(&self.service),
                 };
 
                 tokio::spawn(async move {
@@ -340,6 +355,7 @@ impl LogWatcher {
                 file_offset: 0,
                 file_handle: String::new(),
                 reader: None,
+                service: Arc::clone(&self.service),
             };
 
             tokio::spawn(async move {
