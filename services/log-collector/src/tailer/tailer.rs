@@ -86,16 +86,7 @@ impl Tailer {
                     if bytes == 0 {
                         sleep(Duration::from_millis(100)).await;
                     } else {
-                        // TODO: Process line...maybe send to shared pipeline
-                        // TODO: Ensure backpressure is handled while logs are being sent to the shared pipeline; parser, buffer_batcher, shipper
-                        //
-                        // Get cloned reference to Arc<LogCollectorService> containing all necessary functionality for log processing
-                        //
-                        // 1. Parse the log line....
-                        // 2. Push to shared NormalizedLog InMemoryBufferBatcher
-                        //    2.1. Push to persistence if persistence is configured
-                        // 3. Trigger flush to shipper
-                        // 4. Update necessary metrics
+                        // Actual log processing logic
                         match process_log_line(
                             &self.service.parser,
                             &self.service.buffer_batcher,

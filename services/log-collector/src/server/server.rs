@@ -66,6 +66,7 @@ impl log_collector_server::LogCollector for LogCollectorService {
                     Ok(raw_log) => {
                         let line = raw_log.line;
 
+                        // Actual log processing logic
                         match process_log_line(
                             &log_parser,
                             &log_buffer_batcher,
