@@ -26,3 +26,4 @@ http-body-util = "0.1"
 hyper-util = { version = "0.1", features = ["full"] }
 prometheus = "0.14.0"
 lazy_static = "1.5.0"
+clap = "4.5.51"
