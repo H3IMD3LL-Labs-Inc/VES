@@ -12,15 +12,6 @@ mod shipper;
 mod tailer;
 mod watcher;
 
-use anyhow::Result;
-use std::path::PathBuf;
-use std::sync::Arc;
-use tonic::transport::Server;
-
-use crate::buffer_batcher::log_buffer_batcher::InMemoryBuffer;
-use crate::helpers::load_config::Config;
-use crate::proto::collector::log_collector_server::LogCollectorServer;
-use crate::server::server::LogCollectorService;
 use crate::shipper::shipper::Shipper;
 use crate::watcher::watcher::LogWatcher;
 

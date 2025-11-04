@@ -25,6 +25,7 @@ http-body-util.workspace = true
 hyper-util.workspace = true
 prometheus.workspace = true
 lazy_static.workspace = true
+clap.workspace = true
 
 [build-dependencies]
 tonic-prost-build = "0.14.2"
