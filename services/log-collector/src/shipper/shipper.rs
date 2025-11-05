@@ -22,16 +22,16 @@
 //! the buffer-batcher should react according to its overflow policy.
 
 use rand::Rng;
-use serde::Deserialize;
 use std::time::Duration;
-use thiserror::Error;
 use tokio::sync::mpsc;
 use tokio::time::sleep;
+use tokio_stream::wrappers::ReceiverStream;
 use tonic::transport::{Channel, Endpoint};
 
 use crate::buffer_batcher::log_buffer_batcher::InMemoryBuffer;
+use crate::helpers::converters::*;
 use crate::helpers::load_config::ShipperConfig;
-use crate::proto::common::NormalizedLog;
+use crate::proto::common::NormalizedLog as ProtoNormalizedLog;
 use crate::proto::embedder::{EmbedResponse, embedder_client::EmbedderClient};
 
 /// Shipper
@@ -96,7 +96,7 @@ impl Shipper {
     }
 }
 
-/// Backgground worker loop (owns the outbound gRPC stream).
+/// Background worker loop (owns the outbound gRPC stream).
 ///
 /// High level algorithm:
 /// 1. Repeatedly attempt to connect to the Embedder using `connect_with_retry`.
@@ -118,52 +118,71 @@ async fn run_worker(config: ShipperConfig, mut rx: mpsc::Receiver<InMemoryBuffer
     loop {
         match connect_with_retry(&config).await {
             Ok(mut client) => {
-                // Open bi-directional streaming RPC
-                let stream = client.embed_log().await;
-                match stream {
-                    Ok(mut stream) => {
-                        // Split stream into sender and receiver halves
-                        let (mut req_tx, mut resp_rx) = stream.into_parts();
+                // Create a bounded channel for sending NormalizedLog messages to the Embedder
+                let (out_tx, out_rx) = mpsc::channel::<ProtoNormalizedLog>(10);
+                let request_stream = ReceiverStream::new(out_rx);
 
+                // Open bi-directional gRPC stream
+                match client.embed_log(request_stream).await {
+                    Ok(response) => {
+                        let mut response_stream = response.into_inner();
+
+                        eprintln!("Connected to Embedder; streaming logs...");
+
+                        // Main per-connection loop
                         loop {
                             tokio::select! {
+                                // Forward logs to gRPC request stream
                                 maybe_batch = rx.recv() => {
                                     match maybe_batch {
                                         Some(batch) => {
                                             for log in batch.queue {
-                                                if let Err(e) = req_tx.send(log).await {
-                                                    eprintln!("Failed to send log: {:?}", e);
-                                                    break; // trigger reconnect attempt(s)
+                                                // Convert internal NormalizedLog -> protobuf NormalizedLog
+                                                let protobuf_log: ProtoNormalizedLog = log.into();
+                                                if out_tx.send(protobuf_log).await.is_err() {
+                                                    eprintln!("Embedder stream closed while sending log");
+                                                    break;
                                                 }
                                             }
                                         }
-                                        None => break, // channel closed
+                                        None => {
+                                            eprintln!("Log source closed; ending Shipper worker.");
+                                            return;
+                                        }
                                     }
                                 }
-                                resp = resp_rx.message() => {
-                                    match resp {
-                                        Ok(Some(embed_resp)) => handle_embed_response(embed_resp),
-                                        Ok(None) => {
-                                            eprintln!("Embedder closed response stream");
-                                            break;
+
+                                // Receive messages from Embedder
+                                maybe_resp = response_stream.message() => {
+                                    match maybe_resp.transpose() {
+                                        Some(Ok(embed_resp)) => handle_embed_response(embed_resp),
+                                        Some(Err(e)) => {
+                                            eprintln!("Error receiving embed response: {:?}", e);
+                                            break;  // reconnect
                                         }
-                                        Err(e) => {
-                                            eprintln!("Error receiving from embedder: {:?}", e);
-                                            break;
+                                        None => {
+                                            eprintln!("Embedder closed response stream");
+                                            break;  // reconnect
                                         }
                                     }
                                 }
                             }
                         }
+
+                        eprintln!("Stream ended; reconnecting to Embedder...");
                     }
+
                     Err(e) => {
                         eprintln!("Failed to open embed_log stream: {:?}", e);
+                        // short delat before retrying avoids tight loop
+                        tokio::time::sleep(Duration::from_secs(1)).await;
                     }
                 }
             }
+
             Err(e) => {
-                eprintln!("Failed to connect to Embedder: {e:?}");
-                // Backoff already handled in connect_with_retry
+                eprintln!("Failed to connect to Embedder: {:?}", e);
+                // backoff handled inside connect_with_retry()
             }
         }
     }
