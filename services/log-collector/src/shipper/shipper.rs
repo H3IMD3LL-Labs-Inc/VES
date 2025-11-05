@@ -198,7 +198,7 @@ async fn connect_with_retry(
             }
             Err(e) => {
                 if let Some(limit) = config.max_reconnect_attempts {
-                    if attempts >= limit {
+                    if attempt >= limit {
                         return Err(e);
                     }
                 }
