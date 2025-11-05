@@ -1,44 +1,59 @@
+use bytes::Bytes;
+use http_body_util::Full;
 use hyper::{
-    Body, Method, Request, Response, Server,
-    service::{make_service_fn, service_fn},
+    body::Incoming,
+    http::{Method, Request, Response, StatusCode},
+    service::service_fn,
 };
+use hyper_util::{rt::TokioExecutor, server::conn::auto::Builder as HyperServerBuilder};
 use prometheus::{Encoder, TextEncoder};
-use std::convert::Infalliable;
+use std::{convert::Infallible, net::SocketAddr};
+use tokio::net::TcpListener;
 
-async fn metrics_handler(_req: Request<Body>) -> Result<Response<Body>, Infalliable> {
+async fn metrics_handler(_req: Request<Incoming>) -> Result<Response<Full<Bytes>>, Infallible> {
     // Gather all registered metrics
     let metrics_families = prometheus::gather();
 
-    // Encode them into the Prometheus text format
+    // Encode into Prometheus text format
     let encoder = TextEncoder::new();
     let mut buffer = Vec::new();
     encoder.encode(&metrics_families, &mut buffer).unwrap();
 
-    // Return as HTTP response
-    Ok(Response::new(Body::from(buffer)))
+    Ok(Response::new(Full::new(Bytes::from(buffer))))
 }
 
 pub async fn start_metrics_server(addr: &str) {
-    // Build service factory
-    let make_svc = make_service_fn(|_conn| async {
-        Ok::<_, Infalliable>(service_fn(|req: Request<Body>| async move {
-            match (req.method(), req.uri().path()) {
-                (&Method::GET, "/metrics") => metrics_handler(req).await,
-                _ => Ok(Response::builder()
-                    .status(404)
-                    .body(Body::from("Not Found"))
-                    .unwrap()),
-            }
-        }))
-    });
-
-    // Parse and bind address
-    let addr = addr.parse().unwrap();
-    let server = Server::bind(&addr).serve(make_svc);
+    // Parse the address and bind manually (Hyper 1.0 no longer does this automatically)
+    let addr: SocketAddr = addr.parse().unwrap();
+    let listener = TcpListener::bind(addr).await.unwrap();
 
     println!("Performance metrics available at http://{}/metrics", addr);
 
-    if let Err(e) = server.await {
-        eprintln!("Metrics server error: {}", e)
+    loop {
+        let (stream, _) = listener.accept().await.unwrap();
+
+        let io = hyper_util::rt::TokioIo::new(stream);
+        let service = service_fn(|req: Request<Incoming>| async move {
+            match (req.method(), req.uri().path()) {
+                (&Method::GET, "/metrics") => metrics_handler(req).await,
+                _ => {
+                    let not_found = Full::new(Bytes::from_static(b"Not Found"));
+                    Ok(Response::builder()
+                        .status(StatusCode::NOT_FOUND)
+                        .body(not_found)
+                        .unwrap())
+                }
+            }
+        });
+
+        // Spawn a task to handle the connection
+        tokio::spawn(async move {
+            if let Err(err) = HyperServerBuilder::new(TokioExecutor::new())
+                .serve_connection(io, service)
+                .await
+            {
+                eprintln!("Metrics server error: {err}");
+            }
+        });
     }
 }

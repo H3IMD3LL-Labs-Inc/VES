@@ -1,13 +1,12 @@
-use crate::helpers::load_config::BufferConfig;
+use crate::helpers::load_config::{BufferConfig, DurabilityConfig};
 use crate::parser::parser::NormalizedLog;
+use r2d2::{Pool, PooledConnection};
+use r2d2_sqlite::SqliteConnectionManager;
 use rusqlite::{Connection, Result, params};
-use serde::Deserialize;
 use std::collections::VecDeque;
 use std::sync::Arc;
 use std::time::Duration;
-use tokio::fs;
 use tokio::sync::Notify;
-use tokio::task;
 use tokio::time::Instant;
 
 /// In-Memory Buffer (runtime structure)
@@ -26,10 +25,10 @@ pub struct InMemoryBuffer {
 }
 
 /// Runtime durability (contains real durability resources used by InMemoryBuffer)
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum Durability {
     InMemory,
-    SQLite(Connection),
+    SQLite(Arc<Pool<SqliteConnectionManager>>),
 }
 
 impl InMemoryBuffer {
@@ -61,9 +60,12 @@ impl InMemoryBuffer {
             }
             DurabilityConfig::SQLite(path) => {
                 println!("Creating persistent buffer with SQLite support at {}", path);
-                let conn = Connection::open(path)
-                    .unwrap_or_else(|e| panic!("Failed to open SQLite DB {}: {}", path, e));
 
+                let manager = SqliteConnectionManager::file(path);
+                let pool = Pool::new(manager)
+                    .unwrap_or_else(|e| panic!("Failed to create SQLite pool: {}", e));
+
+                let conn = pool.get().expect("Failed to get pooled SQLite connection");
                 conn.execute(
                     "CREATE TABLE IF NOT EXISTS normalized_logs (
                         id              INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -77,7 +79,7 @@ impl InMemoryBuffer {
                 )
                 .expect("Failed to create normalized_logs table in SQLite");
 
-                Durability::SQLite(conn)
+                Durability::SQLite(Arc::new(pool))
             }
         };
 
@@ -127,10 +129,10 @@ impl InMemoryBuffer {
             /*
              * SQLite mode
              */
-            Durability::SQLite(conn) => {
+            Durability::SQLite(_pool) => {
                 self.queue.push_back(log.clone());
 
-                self.flush(log.clone());
+                self.flush(log.clone()).await?;
             }
         }
 
@@ -179,8 +181,9 @@ impl InMemoryBuffer {
 
         // Perform actual flush based on configured durability
         match &mut self.durability {
-            Durability::SQLite(conn) => {
+            Durability::SQLite(pool) => {
                 for log in &log_batch {
+                    let conn = pool.get().expect("Failed to get connection from pool");
                     conn.execute(
                         "INSERT INTO normalized_logs (timestamp, level, message, metadata, raw_line)
                         VALUES (?1, ?2, ?3, ?4, ?5)",

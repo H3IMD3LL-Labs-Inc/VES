@@ -1,16 +1,16 @@
 use crate::buffer_batcher::log_buffer_batcher::InMemoryBuffer;
 use crate::helpers::log_processing::process_log_line;
 use crate::parser::parser::NormalizedLog;
-use crate::proto::collector::log_collector_server::LogCollector;
-use crate::proto::common::{CollectResponse, RawLog};
+use crate::proto::collector::CollectResponse;
+use crate::proto::common::RawLog;
 use crate::shipper::shipper::Shipper;
 use futures::StreamExt;
 use std::pin::Pin;
 use tokio::sync::mpsc;
 use tokio_stream::wrappers::ReceiverStream;
-use tonic::{Request, Response, Status, transport::Server};
+use tonic::{Request, Response, Status};
 
-#[derive(Debug, Default)]
+#[derive(Debug, Clone)]
 pub struct LogCollectorService {
     pub parser: NormalizedLog,
     pub buffer_batcher: InMemoryBuffer,
@@ -24,7 +24,7 @@ pub struct LogCollectorService {
 // Translates the network requests and the Log Collector
 // actual logic(modules).
 #[tonic::async_trait]
-impl log_collector_server::LogCollector for LogCollectorService {
+impl crate::proto::collector::log_collector_server::LogCollector for LogCollectorService {
     // The type of response stream the server will send back to the client calling it;
     //
     // Client sends a stream of incoming logs(RawLog messages).
@@ -64,7 +64,7 @@ impl log_collector_server::LogCollector for LogCollectorService {
             while let Some(raw_log_result) = inbound_logs.next().await {
                 match raw_log_result {
                     Ok(raw_log) => {
-                        let line = raw_log.line;
+                        let line = raw_log.raw_line;
 
                         // Actual log processing logic
                         match process_log_line(
@@ -75,26 +75,19 @@ impl log_collector_server::LogCollector for LogCollectorService {
                         )
                         .await
                         {
-                            Ok(status) => {
-                                let _ = tx.send(Ok(CollectResponse { status })).await;
+                            Ok(_) => {
+                                let _ = tx.send(Ok(CollectResponse { accepted: true })).await;
                             }
                             Err(e) => {
                                 eprintln!("Log processing error: {}", e);
-                                let _ = tx
-                                    .send(Ok(CollectResponse {
-                                        status: format!("Error: {}", e),
-                                    }))
-                                    .await;
+                                let _ = tx.send(Ok(CollectResponse { accepted: false })).await;
                             }
                         }
                     }
                     Err(e) => {
+                        // Network or stream error
                         eprintln!("Error receiving log: {}", e);
-                        let _ = tx
-                            .send(Ok(CollectResponse {
-                                status: format!("Stream error: {}", e),
-                            }))
-                            .await;
+                        let _ = tx.send(Ok(CollectResponse { accepted: false })).await;
                     }
                 }
             }

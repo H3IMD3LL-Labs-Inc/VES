@@ -1,8 +1,6 @@
-use crate::{daemon, runtime};
+use crate::runtime;
 use anyhow::Result;
 use clap::{Parser, Subcommand};
-use hyper::body::to_bytes;
-use hyper::{Client, Uri};
 use std::path::PathBuf;
 
 #[derive(Parser)]
@@ -25,10 +23,10 @@ enum Commands {
     },
 
     /// TODO: Show log collector metrics reading from /metrics endpoint
-    Status {
+    /*Status {
         #[arg(short, long, default_value = "127.0.0.1:9000")]
         endpoint: String,
-    },
+    },*/
 
     /// TODO: Validate the configuration file before running
     Validate {
@@ -52,7 +50,7 @@ pub async fn run() -> Result<()> {
     match cli.command {
         Commands::Run { config } => runtime::runtime::run_log_collector(config).await?,
         Commands::Validate { config } => validate_config(config).await?,
-        Commands::Status { endpoint } => show_status(endpoint).await?,
+        //Commands::Status { endpoint } => show_status(endpoint).await?,
         Commands::Version => show_version(),
     }
 
@@ -66,29 +64,13 @@ pub async fn run() -> Result<()> {
 /// Validate configuration file
 async fn validate_config(config: PathBuf) -> Result<()> {
     println!("Validating configuration file: {:?}", config);
-    let cfg = crate::helpers::load_config::Config::load(&config)?;
+    let cfg = crate::helpers::load_config::Config::load(&config);
     println!("Configuration valid:\n{:#?}", cfg);
     Ok(())
 }
 
-/// Fetch metrics and status info
-async fn show_status(endpoint: String) -> Result<()> {
-    let url = format!("http://{}/metrics", endpoint);
-    println!("Fetching metrics from {} ...", url);
-
-    let uri: Uri = url.parse()?;
-
-    let client = Client::new();
-
-    let response = client.get(uri).await?;
-
-    let bytes = to_bytes(response.into_body()).await?;
-    let body = String::from_utf8_lossy(&bytes);
-
-    println!("{}", body);
-
-    Ok(())
-}
+/// TODO: Fetch metrics and status info
+//async fn show_status(endpoint: String) -> Result<()> {}
 
 /// Show version information
 fn show_version() {
