@@ -1,5 +1,5 @@
 use chrono::{DateTime, Utc};
-use regex::{Regex, Result};
+use regex::Regex;
 use serde::{Deserialize, Serialize};
 use std::str::FromStr;
 
@@ -120,7 +120,7 @@ impl NormalizedLog {
     ///
     /// Returns provided `LogFormat::CRI` as a `NormalizedLog` struct.
     pub async fn cri_parser(line: &str) -> Result<NormalizedLog, String> {
-        match detect_format(line).await {
+        match Self::detect_format(line).await {
             LogFormat::CRI => {
                 let parts: Vec<&str> = line.splitn(4, ' ').collect();
 
@@ -161,7 +161,7 @@ impl NormalizedLog {
     ///
     /// Returns provided `LogFormat::DockerJSON` as a `NormalizedLog` struct.
     pub async fn docker_json_parser(line: &str) -> Result<NormalizedLog, String> {
-        match detect_format(line).await {
+        match Self::detect_format(line).await {
             LogFormat::DockerJSON => {
                 let parsed: DockerLog = serde_json::from_str(line)
                     .map_err(|e| format!("Failed to parse Docker JSON log: {}", e))?;
@@ -207,7 +207,7 @@ impl NormalizedLog {
     ///
     /// Returns provided `LogFormat::ArbitraryJSON` as a `NormalizedLog` struct.
     pub async fn arbitrary_json_parser(line: &str) -> Result<NormalizedLog, String> {
-        match detect_format(line).await {
+        match Self::detect_format(line).await {
             LogFormat::ArbitraryJSON => {
                 let parts: Vec<&str> = line.splitn(4, ' ').collect();
 
@@ -243,7 +243,7 @@ impl NormalizedLog {
     /// Returns provided `LogFormat::Syslog(SyslogVariant)` as a
     /// `NormalizedLog` struct.
     pub async fn syslog_parser(line: &str) -> Result<NormalizedLog, String> {
-        match detect_format(line).await {
+        match Self::detect_format(line).await {
             LogFormat::Syslog(SyslogVariant::RFC5424) => {
                 let parts: Vec<&str> = line.split_whitespace().collect();
 

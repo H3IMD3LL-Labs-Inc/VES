@@ -1,5 +1,6 @@
 use crate::buffer_batcher::log_buffer_batcher::InMemoryBuffer;
 use crate::helpers::load_config::Config;
+use crate::metrics::http::start_metrics_server;
 use crate::proto::collector::log_collector_server::LogCollectorServer;
 use crate::server::server::LogCollectorService;
 use crate::shipper::shipper::Shipper;
@@ -16,7 +17,7 @@ pub async fn run_log_collector(config_path: PathBuf) -> Result<()> {
 
     // Start metrics server
     tokio::spawn(async {
-        metrics::http::start_metrics_server("0.0.0.0:9000").await;
+        start_metrics_server("0.0.0.0:9000").await;
     });
 
     // Load config

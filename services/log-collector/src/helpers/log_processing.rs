@@ -1,17 +1,9 @@
-use crate::buffer_batcher::log_buffer_batcher::{self, InMemoryBuffer};
+use crate::buffer_batcher::log_buffer_batcher::InMemoryBuffer;
 use crate::parser::parser::NormalizedLog;
 use crate::shipper::shipper::Shipper;
 
 // Internal helper function to perform actual log processing logic, after logs arrive
 // (locally or via network).
-//
-// TODOs:
-//  1. Take raw log line
-//  2. Parse it into NormalizedLog
-//  3. Perform buffer-batching on the NormalizedLog
-//  4. Check flush conditions and perform flush
-//  5. Flush and ship logs if conditions are met
-//  6. Return a human-readable `Result<()>`
 pub async fn process_log_line(
     parser: &NormalizedLog,
     buffer_batcher: &InMemoryBuffer,
