@@ -15,9 +15,9 @@ pub struct NormalizedLog {
 
 /// Define Metadata fields to add using `Metadata Enricher`
 #[derive(Debug, Serialize, Deserialize, Clone)]
-struct Metadata {
-    stream: String,
-    flag: Option<String>,
+pub struct Metadata {
+    pub stream: String,
+    pub flag: Option<String>,
 }
 
 /// Helper DockerJSONLog struct to deserialized Docker JSON logs
