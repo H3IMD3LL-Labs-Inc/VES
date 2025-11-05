@@ -30,6 +30,7 @@ lazy_static.workspace = true
 clap.workspace = true
 bytes.workspace = true
 futures.workspace = true
+prost-types.workspace = true
 
 [build-dependencies]
 tonic-prost-build = "0.14.2"
