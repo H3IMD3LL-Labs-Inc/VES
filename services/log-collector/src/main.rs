@@ -1,11 +1,7 @@
 mod buffer_batcher;
 mod cli;
-mod control_observability;
-mod filter_redactor;
 mod helpers;
-mod metadata_enricher;
 mod metrics;
-mod models;
 mod parser;
 mod proto;
 mod runtime;
