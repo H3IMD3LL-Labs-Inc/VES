@@ -179,13 +179,24 @@ impl InMemoryBuffer {
         // Collect the logs being flushed in an InMemoryBuffer
         let drained_logs: Vec<NormalizedLog> = self.queue.drain(..flush_count).collect();
 
-        // Wrap collected logs from log_batch in InMemoryBuffer
-        let buffer = InMemoryBuffer::from(drained_logs);
+        // Wrap collected logs from log_batch in an InMemoryBuffer
+        let buffer = InMemoryBuffer {
+            queue: VecDeque::from(drained_logs),
+            buffer_capacity: self.buffer_capacity,
+            batch_size: self.batch_size,
+            batch_timeout_ms: self.batch_timeout_ms,
+            last_flush_at: self.last_flush_at,
+            durability: self.durability.clone(),
+            overflow_policy: self.overflow_policy.clone(),
+            drain_policy: self.drain_policy.clone(),
+            flush_policy: self.flush_policy.clone(),
+            notify: self.notify.clone(),
+        };
 
         // Perform actual flush based on configured durability
         match &mut self.durability {
             Durability::SQLite(pool) => {
-                let conn = pool.get().expect("Failed to get connection from pool");
+                let mut conn = pool.get().expect("Failed to get connection from pool");
                 let tx = conn.transaction()?; // begin transaction
 
                 for log in buffer.queue.iter() {
