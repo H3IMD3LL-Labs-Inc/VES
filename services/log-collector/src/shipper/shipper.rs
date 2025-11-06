@@ -36,11 +36,11 @@ use crate::proto::embedder::{EmbedResponse, embedder_client::EmbedderClient};
 
 /// Shipper
 ///
-/// Runtime object owned by the Collector that exposes a `send(batch)` API to enqueue
-/// normalized log batches for delivery to the Embedder. The Shipper:
+/// Runtime object owned by the Log Collector that exposes a `send(batch: InMemoryBuffer)` API to enqueue
+/// normalized log batches for delivery to the Log Embedder micro-service. The Shipper:
 ///     - owns the background worker that manages the gRPC connection,
 ///     - accepts small handoff batches via a bounded `mpsc::Sender`,
-///     - does not provide durable storage - buffering/persistence lives in buffer-batcher.
+///     - does not provide durable storage - buffering/persistence lives in buffer-batcher module.
 ///
 /// Why a small mpsc channel?
 ///     - It decouples the caller from network ops so the pipeline continues to produce
