@@ -54,8 +54,7 @@ impl crate::proto::collector::log_collector_server::LogCollector for LogCollecto
         let (tx, rx) = mpsc::channel(32);
 
         // Cloned references to modules(actual log collector logic) used by the Log Collector since self is &self
-        let log_parser = self.parser.clone();
-        let log_buffer_batcher = self.buffer_batcher.clone();
+        let mut log_buffer_batcher = self.buffer_batcher.clone();
         let log_shipper = self.shipper.clone();
 
         // Spawn a background task to handle the incoming stream of logs
@@ -67,13 +66,8 @@ impl crate::proto::collector::log_collector_server::LogCollector for LogCollecto
                         let line = raw_log.raw_line;
 
                         // Actual log processing logic
-                        match process_log_line(
-                            &log_parser,
-                            &log_buffer_batcher,
-                            &log_shipper,
-                            line.clone(),
-                        )
-                        .await
+                        match process_log_line(&mut log_buffer_batcher, &log_shipper, line.clone())
+                            .await
                         {
                             Ok(_) => {
                                 let _ = tx.send(Ok(CollectResponse { accepted: true })).await;

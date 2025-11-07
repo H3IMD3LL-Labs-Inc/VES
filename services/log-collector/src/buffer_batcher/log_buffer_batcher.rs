@@ -144,7 +144,7 @@ impl InMemoryBuffer {
     /// duplication.
     ///
     /// Returns flushed `NormalizedLog` batch after flush is triggered.
-    pub async fn flush(&mut self, log: NormalizedLog) -> Result<Option<Vec<NormalizedLog>>> {
+    pub async fn flush(&mut self, log: NormalizedLog) -> Result<Option<InMemoryBuffer>> {
         // Variables to store user configured flush triggers
         let flush_by_batch_size = self.queue.len() >= self.batch_size;
         let flush_by_batch_timeout_ms = Instant::now().duration_since(self.last_flush_at)
@@ -176,15 +176,31 @@ impl InMemoryBuffer {
                 self.queue.len()
             };
 
-        // Collect the logs being flushed
-        let log_batch: Vec<NormalizedLog> = self.queue.iter().take(flush_count).cloned().collect();
+        // Collect the logs being flushed in an InMemoryBuffer
+        let drained_logs: Vec<NormalizedLog> = self.queue.drain(..flush_count).collect();
+
+        // Wrap collected logs from log_batch in an InMemoryBuffer
+        let buffer = InMemoryBuffer {
+            queue: VecDeque::from(drained_logs),
+            buffer_capacity: self.buffer_capacity,
+            batch_size: self.batch_size,
+            batch_timeout_ms: self.batch_timeout_ms,
+            last_flush_at: self.last_flush_at,
+            durability: self.durability.clone(),
+            overflow_policy: self.overflow_policy.clone(),
+            drain_policy: self.drain_policy.clone(),
+            flush_policy: self.flush_policy.clone(),
+            notify: self.notify.clone(),
+        };
 
         // Perform actual flush based on configured durability
         match &mut self.durability {
             Durability::SQLite(pool) => {
-                for log in &log_batch {
-                    let conn = pool.get().expect("Failed to get connection from pool");
-                    conn.execute(
+                let mut conn = pool.get().expect("Failed to get connection from pool");
+                let tx = conn.transaction()?; // begin transaction
+
+                for log in buffer.queue.iter() {
+                    tx.execute(
                         "INSERT INTO normalized_logs (timestamp, level, message, metadata, raw_line)
                         VALUES (?1, ?2, ?3, ?4, ?5)",
                         params![
@@ -196,20 +212,16 @@ impl InMemoryBuffer {
                         ],
                     )?;
                 }
-
-                // Update state after successful persistence to SQLite
-                self.queue.drain(..flush_count);
+                tx.commit()?; // commit transaction once
                 self.last_flush_at = Instant::now();
-                Ok(Some(log_batch))
+                Ok(Some(buffer))
             }
             Durability::InMemory => {
-                // No SQLite persistence configured, drain and return
-                self.queue.drain(..flush_count);
                 self.last_flush_at = Instant::now();
                 eprintln!(
                     "Durability set to `InMemory`: returning flushed logs without persistence to SQLite."
                 );
-                Ok(Some(log_batch))
+                Ok(Some(buffer))
             }
         }
     }
