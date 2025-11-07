@@ -99,6 +99,7 @@ impl NormalizedLog {
     pub async fn select_parser(line: &str) -> Result<NormalizedLog, String> {
         // Detect the log line's format
         let detected_format = Self::detect_format(line).await;
+
         // Match this format to an appropriate parser for parsing
         match detected_format {
             LogFormat::CRI => Self::cri_parser(line).await,
@@ -125,7 +126,7 @@ impl NormalizedLog {
                 let parts: Vec<&str> = line.splitn(4, ' ').collect();
 
                 if parts.len() < 4 {
-                    Err(eprintln!(
+                    return Err(format!(
                         "Attempted parsing for log {} failed. Log {} is not CRI format!",
                         line, line
                     ));
@@ -136,13 +137,13 @@ impl NormalizedLog {
                 let flag = Some(parts[2].to_string());
                 let message = parts[3].to_string();
 
-                NormalizedLog {
+                Ok(NormalizedLog {
                     timestamp,
                     level: None,
                     message,
                     metadata: Some(Metadata { stream, flag }),
                     raw_line: line.to_string(),
-                }
+                })
             }
             other => {
                 return Err(format!(
@@ -170,13 +171,13 @@ impl NormalizedLog {
                 let stream = parsed.stream;
                 let message = parsed.log.trim_end().to_string();
 
-                let normalized = NormalizedLog {
+                Ok(NormalizedLog {
                     timestamp,
                     level: None,
                     message,
                     metadata: Some(Metadata { stream, flag: None }),
                     raw_line: line.to_string(),
-                };
+                })
             }
             other => {
                 return Err(format!(
@@ -215,16 +216,16 @@ impl NormalizedLog {
                 let level = Some(parts[1].to_string());
                 let message = parts[2].to_string();
 
-                NormalizedLog {
+                Ok(NormalizedLog {
                     timestamp,
                     level,
                     message,
                     metadata: None,
                     raw_line: line.to_string(),
-                }
+                })
             }
             other => {
-                return Err(eprintln!(
+                return Err(format!(
                     "Unexpected log format, not ArbitraryJSON: {:?}",
                     other
                 ));
@@ -250,13 +251,13 @@ impl NormalizedLog {
                 let timestamp = DateTime::from_str(parts[2]).unwrap_or_else(|_| Utc::now());
                 let message = parts[8].to_string();
 
-                NormalizedLog {
+                Ok(NormalizedLog {
                     timestamp,
                     level: None,
                     message,
                     metadata: None,
                     raw_line: line.to_string(),
-                }
+                })
             }
             LogFormat::Syslog(SyslogVariant::RFC3164) => {
                 let parts: Vec<&str> = line.splitn(5, ' ').collect();
@@ -264,13 +265,13 @@ impl NormalizedLog {
                 let timestamp = DateTime::from_str(parts[1]).unwrap_or_else(|_| Utc::now());
                 let message = parts[4].to_string();
 
-                NormalizedLog {
+                Ok(NormalizedLog {
                     timestamp,
                     level: None,
                     message,
                     metadata: None,
                     raw_line: line.to_string(),
-                }
+                })
             }
             other => {
                 return Err(format!(
