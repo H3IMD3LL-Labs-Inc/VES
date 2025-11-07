@@ -2,7 +2,6 @@ use anyhow::Result;
 use notify::{Event, RecommendedWatcher, RecursiveMode, Watcher};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use std::fs;
 use std::os::unix::fs::MetadataExt;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
@@ -18,13 +17,13 @@ struct FileState {
     offset: u64,
 }
 
-#[derive(Debug, Default, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize)]
 struct Checkpoint {
     files: HashMap<PathBuf, FileState>,
 }
 
 /// Main log watcher struct.
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug)]
 pub struct LogWatcher {
     pub log_dir: PathBuf,
     pub checkpoint_path: PathBuf,
@@ -232,11 +231,12 @@ impl LogWatcher {
                     self.handle_file_removal(path).await?;
                 }
             }
-            notify::EventKind::Modify(notify::event::ModifyKind::Name) => {
+            // TODO: Fix..
+            /*notify::EventKind::Modify(notify::event::ModifyKind::Name) => {
                 // This event can be tricky. A rename is often a remove + create
                 // or move event. `notify` handles this well enough that we can rely
                 // primarily on the `Create` and `Remove` events.
-            }
+            }*/
             _ => (),
         }
         Ok(())
@@ -318,15 +318,14 @@ impl LogWatcher {
     /// change). This periodically scans the directory again.
     ///
     pub async fn discover_new_files(&mut self) -> Result<()> {
-        let entries = tokio::fs::read_dir(&self.log_dir)?;
+        let mut entries = tokio::fs::read_dir(&self.log_dir).await?;
 
-        for entry in entries {
-            let entry = entry?;
+        while let Some(entry) = entries.next_entry().await? {
             let path = entry.path();
 
             // Only consider `.log` files
             if path.extension().map_or(false, |ext| ext == "log") {
-                let metadata = entry.metadata()?;
+                let metadata = entry.metadata().await?;
                 let inode = metadata.ino();
 
                 self.handle_new_file(inode, &path).await?;
