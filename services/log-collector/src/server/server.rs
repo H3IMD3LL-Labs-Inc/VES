@@ -6,6 +6,8 @@ use crate::proto::common::RawLog;
 use crate::shipper::shipper::Shipper;
 use futures::StreamExt;
 use std::pin::Pin;
+use std::sync::Arc;
+use tokio::sync::Mutex;
 use tokio::sync::mpsc;
 use tokio_stream::wrappers::ReceiverStream;
 use tonic::{Request, Response, Status};
@@ -13,7 +15,7 @@ use tonic::{Request, Response, Status};
 #[derive(Debug, Clone)]
 pub struct LogCollectorService {
     pub parser: NormalizedLog,
-    pub buffer_batcher: InMemoryBuffer,
+    pub buffer_batcher: Arc<Mutex<InMemoryBuffer>>,
     pub shipper: Shipper,
 }
 
