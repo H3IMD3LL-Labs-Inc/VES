@@ -1,4 +1,4 @@
-use anyhow::Result;
+use anyhow::{Context, Result};
 use serde::Deserialize;
 use std::fs;
 use std::path::Path;
@@ -20,9 +20,13 @@ pub struct Config {
 
 impl Config {
     /// Load and parse the configuration file
-    pub fn load<P: AsRef<Path>>(path: P) -> Result<Self, Box<dyn std::error::Error>> {
-        let config_str = fs::read_to_string(path)?;
-        let config: Config = toml::from_str(&config_str)?;
+    pub fn load<P: AsRef<Path>>(path: P) -> Result<Self> {
+        let path_ref = path.as_ref();
+
+        let config_str = fs::read_to_string(path_ref)
+            .with_context(|| format!("Faield to read config file at {:?}", path_ref))?;
+        let config: Config = toml::from_str(&config_str)
+            .with_context(|| format!("Failed to parse TOML from {:?}", path_ref))?;
         Ok(config)
     }
 }

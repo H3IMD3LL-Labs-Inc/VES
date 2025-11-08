@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 use std::str::FromStr;
 
 /// Define normalized log output
-#[derive(Debug, Deserialize, Clone)]
+#[derive(Default, Debug, Deserialize, Clone)]
 pub struct NormalizedLog {
     pub timestamp: DateTime<Utc>,
     pub level: Option<String>,

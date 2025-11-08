@@ -5,6 +5,7 @@ use std::sync::Arc;
 use tokio::fs::File;
 use tokio::io::{self, AsyncBufReadExt, BufReader};
 use tokio::io::{AsyncSeekExt, SeekFrom};
+use tokio::sync::Mutex;
 use tokio::time::{Duration, sleep};
 
 use crate::buffer_batcher::log_buffer_batcher::InMemoryBuffer;
@@ -14,7 +15,7 @@ use crate::server::server::LogCollectorService;
 use crate::shipper::shipper::Shipper;
 
 /// Tailer struct
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug)]
 pub struct Tailer {
     pub file_path: PathBuf,
     pub file_offset: u64,
@@ -86,10 +87,9 @@ impl Tailer {
                     if bytes == 0 {
                         sleep(Duration::from_millis(100)).await;
                     } else {
-                        // Actual log processing logic
+                        let mut buffer = self.service.buffer_batcher.lock().await; // Acquire InMemoryBuffer Mutex lock
                         match process_log_line(
-                            &self.service.parser,
-                            &self.service.buffer_batcher,
+                            &mut *buffer,
                             &self.service.shipper,
                             line.clone(),
                         )
@@ -97,7 +97,7 @@ impl Tailer {
                             Ok(status) => println!("Processed log from {:?}: {}", self.file_path, status),
                             Err(err) => eprintln!("Error processing log from {:?}: {}", self.file_path, err),
                         }
-                    }
+                    } // InMemoryBuffer lock released automatically
                     line.clear();
                 }
                 _ = shutdown_rx.changed() => {
@@ -107,9 +107,10 @@ impl Tailer {
                     }
                 }
             }
-
-            // Flush offsets / cleanup
-            return Ok(());
         }
+
+        // Flush offsets/cleanup
+        println!("Tailer stopped for {:?}", self.file_path);
+        Ok(())
     }
 }

@@ -6,6 +6,8 @@ use crate::proto::common::RawLog;
 use crate::shipper::shipper::Shipper;
 use futures::StreamExt;
 use std::pin::Pin;
+use std::sync::Arc;
+use tokio::sync::Mutex;
 use tokio::sync::mpsc;
 use tokio_stream::wrappers::ReceiverStream;
 use tonic::{Request, Response, Status};
@@ -13,7 +15,7 @@ use tonic::{Request, Response, Status};
 #[derive(Debug, Clone)]
 pub struct LogCollectorService {
     pub parser: NormalizedLog,
-    pub buffer_batcher: InMemoryBuffer,
+    pub buffer_batcher: Arc<Mutex<InMemoryBuffer>>,
     pub shipper: Shipper,
 }
 
@@ -54,7 +56,7 @@ impl crate::proto::collector::log_collector_server::LogCollector for LogCollecto
         let (tx, rx) = mpsc::channel(32);
 
         // Cloned references to modules(actual log collector logic) used by the Log Collector since self is &self
-        let mut log_buffer_batcher = self.buffer_batcher.clone();
+        let log_buffer_batcher = self.buffer_batcher.clone();
         let log_shipper = self.shipper.clone();
 
         // Spawn a background task to handle the incoming stream of logs
@@ -64,11 +66,10 @@ impl crate::proto::collector::log_collector_server::LogCollector for LogCollecto
                 match raw_log_result {
                     Ok(raw_log) => {
                         let line = raw_log.raw_line;
+                        let mut buffer = log_buffer_batcher.lock().await; // Acquire InMemoryBuffer lock to safely access shared InMemoryBuffer
 
                         // Actual log processing logic
-                        match process_log_line(&mut log_buffer_batcher, &log_shipper, line.clone())
-                            .await
-                        {
+                        match process_log_line(&mut *buffer, &log_shipper, line.clone()).await {
                             Ok(_) => {
                                 let _ = tx.send(Ok(CollectResponse { accepted: true })).await;
                             }
