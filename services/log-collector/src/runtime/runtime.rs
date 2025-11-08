@@ -9,6 +9,7 @@ use crate::watcher::watcher::LogWatcher;
 use anyhow::Result;
 use std::path::PathBuf;
 use std::sync::Arc;
+use tokio::sync::Mutex;
 use tonic::transport::Server;
 
 pub async fn run_log_collector(config_path: PathBuf) -> Result<()> {
@@ -22,31 +23,33 @@ pub async fn run_log_collector(config_path: PathBuf) -> Result<()> {
 
     // Load config
     println!("Loading configurations...");
-    let cfg = Config::load("log_collector.toml");
+    let cfg = Config::load(&config_path)?;
 
     // Initialize log collector components
     println!("Initializing Log Collector...");
-    let buffer = InMemoryBuffer::new(&cfg.buffer).await;
-    let shipper = Shipper::new(&cfg.shipper).await;
-    let parser = Default::default(); // TODO: Replace with configurable parser
+    let buffer = Arc::new(Mutex::new(InMemoryBuffer::new(cfg.buffer).await));
+    let shipper = Shipper::new(cfg.shipper).await;
+    let parser = Default::default(); // TODO: Replace with configurable parser, leave as is for now....
 
     // Create shared LogCollectorService instance
     let service = Arc::new(LogCollectorService {
         parser,
-        buffer_batcher: buffer,
+        buffer_batcher: Arc::clone(&buffer),
         shipper,
     });
 
-    // Spawn local logs watcher
+    // Spawn local logs watcher (local-mode)
     if cfg.general.enable_local_mode {
         if let Some(wcfg) = &cfg.watcher {
             if wcfg.enabled {
                 println!("Starting local file watcher on: {}", wcfg.log_dir);
                 let log_dir = PathBuf::from(&wcfg.log_dir);
                 let checkpoint_path = PathBuf::from(&wcfg.checkpoint_path);
+                let poll_interval_ms = wcfg.poll_interval_ms;
+                let recursive = wcfg.recursive;
 
                 // Clone the Arc so watcher shares the internal components with `network_mode_enabled`
-                let shared_service = Arc::clone(service);
+                let shared_service = Arc::clone(&service);
 
                 tokio::spawn(async move {
                     // Builder function — creates and configures LogWatcher before it starts doing
@@ -54,9 +57,9 @@ pub async fn run_log_collector(config_path: PathBuf) -> Result<()> {
                     match LogWatcher::new_watcher(
                         log_dir,
                         checkpoint_path,
+                        poll_interval_ms,
+                        recursive,
                         shared_service,
-                        wcfg.poll_interval_ms,
-                        wcfg.recursive,
                     )
                     .await
                     {
@@ -85,9 +88,12 @@ pub async fn run_log_collector(config_path: PathBuf) -> Result<()> {
 
         Server::builder()
             .add_service(LogCollectorServer::new((*service).clone()))
-            .server("[::1]:50052".parse()?)
+            .serve("[::1]:50052".parse()?)
             .await?;
+
+        Ok(())
     } else {
         println!("Network mode disabled in [general] configuration.");
+        Ok(())
     }
 }
