@@ -32,7 +32,7 @@ pub enum Durability {
 }
 
 impl InMemoryBuffer {
-    pub async fn new(buffer_config: &BufferConfig) -> Self {
+    pub async fn new(buffer_config: BufferConfig) -> Self {
         let queue = match buffer_config.capacity_option.as_str() {
             "bounded" => {
                 println!(
