@@ -33,7 +33,7 @@ use tokio::sync::broadcast;
 /// - Each Log Collector component calls `.subscribe()` to get its own receiver.
 /// - Calling `.trigger()` sends the shutdown signal to all components.
 ///
-/// Design choice:
+/// # Design choice:
 /// Unlike `Notify` or `tokio::sync::watch`, `broadcast` is a multi-consumer one-
 /// shot signalling primitive:
 /// - All receivers get the same message.
@@ -61,5 +61,12 @@ impl Shutdown {
     /// Trigger shutdown event, notifying all components with Receivers
     pub fn trigger(&self) {
         let _ = self.tx.send(());
+    }
+
+    /// Wait for a shutdown signal (used in main runtime or top-level managers).
+    /// Simply blocks until `.trigger()` is called.
+    pub async fn wait_for_shutdown(&self) {
+        let mut rx = self.tx.subscribe();
+        let _ = rx.recv().await;
     }
 }
