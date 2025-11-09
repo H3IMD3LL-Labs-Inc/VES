@@ -32,6 +32,14 @@ use tokio::sync::broadcast;
 /// - `tx` is cloned by each Log Collector component.
 /// - Each Log Collector component calls `.subscribe()` to get its own receiver.
 /// - Calling `.trigger()` sends the shutdown signal to all components.
+///
+/// Design choice:
+/// Unlike `Notify` or `tokio::sync::watch`, `broadcast` is a multi-consumer one-
+/// shot signalling primitive:
+/// - All receivers get the same message.
+/// - New subscribers can be added at runtime.
+/// - Each receiver owns its independent read cursor.
+/// - Integrates cleanly with `tokio::select!` for concurrent responsiveness.
 #[derive(Clone)]
 pub struct Shutdown {
     pub tx: broadcast::Sender<()>,
