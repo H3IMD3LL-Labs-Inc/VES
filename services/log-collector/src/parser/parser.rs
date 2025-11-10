@@ -95,7 +95,6 @@ impl NormalizedLog {
         LogFormat::Unknown
     }
 
-    // TODO: Select an appropriate parser based on log formate determined by detect_format
     pub async fn select_parser(line: &str) -> Result<NormalizedLog, String> {
         // Detect the log line's format
         let detected_format = Self::detect_format(line).await;

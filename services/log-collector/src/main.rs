@@ -13,7 +13,7 @@ mod watcher;
 use anyhow::Result;
 
 #[tokio::main]
-async fn main() -> anyhow::Result<()> {
+async fn main() -> Result<()> {
     // Main entrypoint simply delegates control to CLI layer.
     // The CLI parses user commands and then calls into the appropriate logic
     cli::cli::run().await

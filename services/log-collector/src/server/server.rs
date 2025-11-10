@@ -16,7 +16,7 @@ use tonic::{Request, Response, Status};
 pub struct LogCollectorService {
     pub parser: NormalizedLog,
     pub buffer_batcher: Arc<Mutex<InMemoryBuffer>>,
-    pub shipper: Shipper,
+    pub shipper: Arc<Mutex<Shipper>>,
 }
 
 // Bind log collector application logic(LogCollectorService) to

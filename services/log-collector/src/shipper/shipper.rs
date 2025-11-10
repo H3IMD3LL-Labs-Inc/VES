@@ -23,7 +23,8 @@
 
 use rand::Rng;
 use std::time::Duration;
-use tokio::sync::mpsc;
+use tokio::sync::{mpsc, oneshot};
+use tokio::task::JoinHandle;
 use tokio::time::sleep;
 use tokio_stream::wrappers::ReceiverStream;
 use tonic::transport::{Channel, Endpoint};
@@ -48,9 +49,11 @@ use crate::proto::embedder::{EmbedResponse, embedder_client::EmbedderClient};
 ///     - It is intentionally *small* since the authoritative buffer and overflow policy
 ///     are managed by the buffer-batcher (to avoid duplicate buffering and uncontrolled
 ///     memory growth).
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct Shipper {
     sender: mpsc::Sender<InMemoryBuffer>,
+    shutdown_tx: Option<oneshot::Sender<()>>,
+    worker_handle: Option<JoinHandle<()>>,
 }
 
 /// Shipper error handling
@@ -74,8 +77,15 @@ impl Shipper {
     pub async fn new(config: ShipperConfig) -> Self {
         // Small channel to decouple producer and worker
         let (tx, rx) = mpsc::channel(1); // maybe 5-10, for some slack
-        tokio::spawn(run_worker(config.clone(), rx));
-        Self { sender: tx }
+        let (shutdown_tx, shutdown_rx) = oneshot::channel::<()>();
+
+        let handle = tokio::spawn(run_worker(config.clone(), rx, shutdown_rx));
+
+        Self {
+            sender: tx,
+            shutdown_tx: Some(shutdown_tx),
+            worker_handle: Some(handle),
+        }
     }
 
     /// Enqueue a normalized batch for shipping.
@@ -93,6 +103,23 @@ impl Shipper {
             .send(batch)
             .await
             .map_err(|_| ShipperError::QueueFull)
+    }
+
+    /// Gracefully shutdown the Shipper worker
+    ///
+    /// Sends the shutdown signal to the worker and waits for it to finish.
+    pub async fn shutdown(&mut self) {
+        // Send shutdown signal
+        if let Some(shutdown_tx) = self.shutdown_tx.take() {
+            let _ = shutdown_tx.send(());
+        }
+
+        // Wait for the worker to finish
+        if let Some(handle) = self.worker_handle.take() {
+            let _ = handle.await;
+        }
+
+        eprintln!("Shipper shutdown complete.");
     }
 }
 
@@ -114,75 +141,97 @@ impl Shipper {
 ///
 /// Note: The worker keeps the Embedder connection transiently alive - if the Embedder
 /// closes the stream the worker will tear it down and re-establish it.
-async fn run_worker(config: ShipperConfig, mut rx: mpsc::Receiver<InMemoryBuffer>) {
+async fn run_worker(
+    config: ShipperConfig,
+    mut rx: mpsc::Receiver<InMemoryBuffer>,
+    mut shutdown_rx: oneshot::Receiver<()>,
+) {
     loop {
-        match connect_with_retry(&config).await {
-            Ok(mut client) => {
-                // Create a bounded channel for sending NormalizedLog messages to the Embedder
-                let (out_tx, out_rx) = mpsc::channel::<ProtoNormalizedLog>(10);
-                let request_stream = ReceiverStream::new(out_rx);
+        // Exit outer loop if shutdown triggered before connecting is triggered
+        tokio::select! {
+            _ = &mut shutdown_rx => {
+                eprintln!("Shutdown signal received before connection. Exiting worker.");
+                return;
+            }
+            conn_result = connect_with_retry(&config) => {
+                match conn_result {
+                    Ok(mut client) => {
+                        // setup gRPC send channel
+                        let (out_tx, out_rx) = mpsc::channel::<ProtoNormalizedLog>(10);
+                        let request_stream = ReceiverStream::new(out_rx);
 
-                // Open bi-directional gRPC stream
-                match client.embed_log(request_stream).await {
-                    Ok(response) => {
-                        let mut response_stream = response.into_inner();
+                        match client.embed_log(request_stream).await {
+                            Ok(response) => {
+                                let mut response_stream = response.into_inner();
+                                eprintln!("Connected to Embedder; streaming logs...");
 
-                        eprintln!("Connected to Embedder; streaming logs...");
+                                loop {
+                                    tokio::select! {
+                                        // Normal batch forwarding
+                                        maybe_batch = rx.recv() => {
+                                            match maybe_batch {
+                                                Some(batch) => {
+                                                    for log in batch.queue {
+                                                        let protobuf_log: ProtoNormalizedLog = log.into();
+                                                        if out_tx.send(protobuf_log).await.is_err() {
+                                                            eprintln!("Embedder stream closed while sending log");
+                                                            break;
+                                                        }
+                                                    }
+                                                }
+                                                None => {
+                                                    // Channel closed, nothing more to send
+                                                    eprintln!("Log source channel closed, exiting worker.");
+                                                    return;
+                                                }
+                                            }
+                                        }
 
-                        // Main per-connection loop
-                        loop {
-                            tokio::select! {
-                                // Forward logs to gRPC request stream
-                                maybe_batch = rx.recv() => {
-                                    match maybe_batch {
-                                        Some(batch) => {
-                                            for log in batch.queue {
-                                                // Convert internal NormalizedLog -> protobuf NormalizedLog
-                                                let protobuf_log: ProtoNormalizedLog = log.into();
-                                                if out_tx.send(protobuf_log).await.is_err() {
-                                                    eprintln!("Embedder stream closed while sending log");
+                                        // Receive messages from Embedder
+                                        maybe_resp = response_stream.message() => {
+                                            match maybe_resp.transpose() {
+                                                Some(Ok(embed_resp)) => handle_embed_response(embed_resp),
+                                                Some(Err(e)) => {
+                                                    eprintln!("Error receiving embed response: {:?}", e);
+                                                    break;
+                                                }
+                                                None => {
+                                                    eprintln!("Emebedder closed response stream");
                                                     break;
                                                 }
                                             }
                                         }
-                                        None => {
-                                            eprintln!("Log source closed; ending Shipper worker.");
-                                            return;
-                                        }
-                                    }
-                                }
 
-                                // Receive messages from Embedder
-                                maybe_resp = response_stream.message() => {
-                                    match maybe_resp.transpose() {
-                                        Some(Ok(embed_resp)) => handle_embed_response(embed_resp),
-                                        Some(Err(e)) => {
-                                            eprintln!("Error receiving embed response: {:?}", e);
-                                            break;  // reconnect
-                                        }
-                                        None => {
-                                            eprintln!("Embedder closed response stream");
-                                            break;  // reconnect
+                                        // Shutdown signal received
+                                        _ = &mut shutdown_rx => {
+                                            eprintln!("Shutdown signal received, draining remaining batcher...");
+
+                                            // Drain all remaining batches from rx
+                                            while let Ok(batch) = rx.try_recv() {
+                                                for log in batch.queue {
+                                                    let protobuf_log: ProtoNormalizedLog = log.into();
+                                                    let _ = out_tx.send(protobuf_log).await;
+                                                }
+                                            }
+
+                                            eprintln!("All pending batches sent; closing worker.");
                                         }
                                     }
                                 }
                             }
-                        }
 
-                        eprintln!("Stream ended; reconnecting to Embedder...");
+                            Err(e) => {
+                                eprintln!("Failed to open embed_log stream: {:?}", e);
+                                tokio::time::sleep(Duration::from_secs(1)).await;
+                            }
+                        }
                     }
 
                     Err(e) => {
-                        eprintln!("Failed to open embed_log stream: {:?}", e);
-                        // short delat before retrying avoids tight loop
-                        tokio::time::sleep(Duration::from_secs(1)).await;
+                        eprintln!("Failed to connect to Embedder: {:?}", e);
+                        // Retry handled in connect_with_retry()
                     }
                 }
-            }
-
-            Err(e) => {
-                eprintln!("Failed to connect to Embedder: {:?}", e);
-                // backoff handled inside connect_with_retry()
             }
         }
     }

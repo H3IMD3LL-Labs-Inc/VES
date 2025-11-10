@@ -103,6 +103,12 @@ impl Tailer {
                 _ = shutdown_rx.changed() => {
                     if *shutdown_rx.borrow() {
                         println!("Tailer received shutdown signal for {:?}", self.file_path);
+
+                        let mut buffer = self.service.buffer_batcher.lock().await;
+                        if let Err(err) = buffer.flush_remaining_logs().await {
+                            eprintln!("Error flushing buffer on shutdown: {}", err);
+                        }
+
                         break;
                     }
                 }
