@@ -97,6 +97,54 @@ impl InMemoryBuffer {
         }
     }
 
+    /// Gracefully shuts down the InMemoryBuffer.
+    ///
+    /// `shutdown()` ensures:
+    /// - All remaining logs in-memory are flushed to persistence.
+    /// - Any blocked tasks waiting on `notify` are released.
+    /// - The underlying durability layer (SQLite or InMemory) is gracefully closed.
+    /// - No further writes should be attempted after shutdown.
+    pub async fn shutdown(&mut self) -> Result<()> {
+        println!("InMemoryBuffer shutdown initiated...");
+
+        // Wake all waiting tasks, ensuring no task remains blocked waiting
+        // for capacity during shutdown
+        self.notify.notify_waiters();
+
+        // Flush all remaining logs
+        if !self.queue.is_empty() {
+            println!(
+                "Flushing {} remaining logs before shutdown...",
+                self.queue.len()
+            );
+
+            if let Err(err) = self.flush_remaining_logs().await {
+                eprintln!("Error flushing remaining logs: {}", err);
+            } else {
+                println!("Remaining logs successfully flushed.");
+            }
+        } else {
+            println!("No remaining logs to flush.");
+        }
+
+        // Release durability layer resources
+        match &mut self.durability {
+            Durability::SQLite(pool) => {
+                println!("Releasing SQLite connection pool...");
+                // Dropping Arc<Pool> reference allows connections to close naturally.
+                // No explicit close method exists for r2d2 pools.
+                let _ = Arc::get_mut(pool);
+            }
+            Durability::InMemory => {
+                println!("Using in-memory durability, no persistence connection to close.");
+            }
+        }
+
+        println!("InMemoryBuffer Shutdown completed successfully.");
+
+        Ok(())
+    }
+
     /// Check InMemoryBuffer's capacity. This is required to determine
     /// actions in push(), drain(), flush() methods.
     pub fn check_buffer_capacity(&self) -> usize {
@@ -196,7 +244,9 @@ impl InMemoryBuffer {
         // Perform actual flush based on configured durability
         match &mut self.durability {
             Durability::SQLite(pool) => {
-                let mut conn = pool.get().expect("Failed to get connection from pool");
+                let mut conn = pool
+                    .get()
+                    .expect("Failed to get DB connection from connection pool");
                 let tx = conn.transaction()?; // begin transaction
 
                 for log in buffer.queue.iter() {
@@ -224,6 +274,48 @@ impl InMemoryBuffer {
                 Ok(Some(buffer))
             }
         }
+    }
+
+    pub async fn flush_remaining_logs(&mut self) -> Result<()> {
+        if self.queue.is_empty() {
+            return Ok(());
+        }
+
+        println!(
+            "Flushing remaining {} logs from InMemoryBuffer",
+            self.queue.len()
+        );
+        let drained_logs: Vec<NormalizedLog> = self.queue.drain(..).collect();
+
+        match &mut self.durability {
+            Durability::SQLite(pool) => {
+                let mut conn = pool
+                    .get()
+                    .expect("Failed to get DB connection from connection pool");
+                let tx = conn.transaction()?;
+
+                for log in drained_logs.iter() {
+                    tx.execute(
+                        "INSERT INTO normalized_logs (timestamp, level, message, metadata, raw_line)
+                        VALUES (?1, ?2, ?3, ?4, ?5)",
+                        params![
+                            log.timestamp.to_rfc3339(),
+                            log.level,
+                            log.message,
+                            log.metadata.as_ref().map(|m| serde_json::to_string(m).unwrap()),
+                            log.raw_line
+                        ],
+                    )?;
+                }
+                tx.commit()?;
+            }
+            Durability::InMemory => {
+                eprintln!("Durability set to InMemory, logs not persisted.");
+            }
+        }
+
+        self.last_flush_at = Instant::now();
+        Ok(())
     }
 
     /// Drain a `NormalizedLog` batch removing logs from in-memory queue, freeing up

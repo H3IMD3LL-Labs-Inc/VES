@@ -33,8 +33,16 @@ pub async fn run_log_collector(config_path: PathBuf) -> Result<()> {
     });
 
     // Start metrics server (background task)
-    tokio::spawn(async {
-        start_metrics_server("0.0.0.0:9000").await;
+    tokio::spawn({
+        let mut shutdown_rx = shutdown.subscribe();
+        async move {
+            tokio::select! {
+                _ = start_metrics_server("0.0.0.0:9000") => {},
+                _ = shutdown_rx.recv() => {
+                    println!("Metrics server shutting down...");
+                }
+            }
+        }
     });
 
     // Load Log Collector configurations
@@ -46,7 +54,7 @@ pub async fn run_log_collector(config_path: PathBuf) -> Result<()> {
     println!("Initializing Log Collector components...");
 
     let buffer = Arc::new(Mutex::new(InMemoryBuffer::new(cfg.buffer).await));
-    let shipper = Shipper::new(cfg.shipper).await;
+    let shipper = Arc::new(Mutex::new(Shipper::new(cfg.shipper).await));
     let parser = Default::default(); // TODO: Replace with configurable parser, leave as is for now....
 
     println!("Log Collector components initialized successfully...");
@@ -56,7 +64,7 @@ pub async fn run_log_collector(config_path: PathBuf) -> Result<()> {
     let service = Arc::new(LogCollectorService {
         parser,
         buffer_batcher: Arc::clone(&buffer),
-        shipper,
+        shipper: Arc::clone(&shipper),
     });
 
     let mut task_handles: Vec<JoinHandle<()>> = Vec::new();
@@ -76,7 +84,8 @@ pub async fn run_log_collector(config_path: PathBuf) -> Result<()> {
                 let shared_service = Arc::clone(&service);
 
                 // Subscribe to the global shutdown channel
-                let mut shutdown_rx = shutdown.subscribe();
+                let shutdown_rx1 = shutdown.subscribe();
+                let mut shutdown_rx2 = shutdown.subscribe();
 
                 let handle = tokio::spawn(async move {
                     // Builder function — creates and configures LogWatcher before it starts doing
@@ -92,15 +101,14 @@ pub async fn run_log_collector(config_path: PathBuf) -> Result<()> {
                     {
                         Ok(mut watcher) => {
                             tokio::select! {
-                                res = watcher.run_watcher() => {
+                                res = watcher.run_watcher(shutdown_rx1) => {
                                     if let Err(e) = res {
                                         eprintln!("Watcher error: {e}");
                                     }
                                 }
-                                _ = shutdown_rx.recv() => {
+                                _ = shutdown_rx2.recv() => {
                                     println!("Watcher received shutdown signal, cleaning up resources...");
-                                    // TODO: Actually implement `.stop()` method in Watcher for use when a shutdown signal is received
-                                    watcher.stop().await;
+                                    watcher.shutdown().await;
                                 }
                             }
                         }
@@ -125,6 +133,7 @@ pub async fn run_log_collector(config_path: PathBuf) -> Result<()> {
 
         // Subscribe to the global shutdown channel
         let mut shutdown_rx = shutdown.subscribe();
+
         let addr = "[::1]:50052".parse()?;
         let service_clone = (*service).clone();
 
@@ -156,11 +165,13 @@ pub async fn run_log_collector(config_path: PathBuf) -> Result<()> {
     }
 
     // Perform final clean up
-    {
-        let mut buf = buffer.lock().await;
-        buf.shutdown().await?;
-    }
+    let mut buf = buffer.lock().await;
+    buf.shutdown().await?;
 
-    println!("Log COllector successfully shut down.");
+    // Flush any pending logs before shipper exits
+    let mut shipper_lock = shipper.lock().await;
+    shipper_lock.shutdown().await;
+
+    println!("Log Collector successfully shut down.");
     Ok(())
 }

@@ -46,6 +46,9 @@ pub struct LogWatcher {
     // orchestration. It's not supposed to do any actual processing. This is left to the
     // Tailer which uses an `Arc<LogCollectorService>` to actual implement the processing.
     pub service: Arc<LogCollectorService>,
+
+    tailer_handles: Vec<tokio::task::JoinHandle<()>>,
+    tailer_shutdown_txs: Vec<tokio::sync::watch::Sender<bool>>,
 }
 
 /// FileState Methods
@@ -169,11 +172,16 @@ impl LogWatcher {
             poll_interval_ms,
             recursive,
             service,
+            tailer_handles: Vec::new(),
+            tailer_shutdown_txs: Vec::new(),
         })
     }
 
     /// Main async loop that orchestrates the watcher
-    pub async fn run_watcher(&mut self) -> Result<()> {
+    pub async fn run_watcher(
+        &mut self,
+        mut shutdown_rx: tokio::sync::broadcast::Receiver<()>,
+    ) -> Result<()> {
         let (tx, rx) = tokio::sync::mpsc::channel(100);
 
         let mut watcher = RecommendedWatcher::new(
@@ -206,8 +214,32 @@ impl LogWatcher {
                 _ = tokio::time::sleep(tokio::time::Duration::from_millis(poll_interval)) => {
                     self.discover_new_files().await?;
                 }
+                Ok(_) = shutdown_rx.recv() => {
+                    println!("LogWatcher received shutdown signal...");
+                    self.shutdown().await;
+                    break;
+                }
             }
         }
+
+        Ok(())
+    }
+
+    /// Broadcast shutdown signal to all Tailers runnings and await them
+    pub async fn shutdown(&mut self) {
+        println!("Broadcasting shutdown signal to all Tailers...");
+
+        // Send shutdown signal to all Tailers
+        for tx in &self.tailer_shutdown_txs {
+            let _ = tx.send(true);
+        }
+
+        // Awaitt all tailers to finish
+        for handle in self.tailer_handles.drain(..) {
+            let _ = handle.await;
+        }
+
+        println!("Watcher successfully shutdown gracefully.");
     }
 
     /// Handles file system events from the `notify` watcher
@@ -277,6 +309,9 @@ impl LogWatcher {
                 // Track in active_files
                 self.active_files.insert(inode, path.clone());
 
+                // Create shutdown channel for this tailer
+                let (tx, rx) = tokio::sync::watch::channel(false);
+
                 // Start a tailer
                 let mut tailer = Tailer {
                     file_path: path.clone(),
@@ -286,15 +321,18 @@ impl LogWatcher {
                     service: Arc::clone(&self.service),
                 };
 
-                tokio::spawn(async move {
+                let handle = tokio::spawn(async move {
                     if let Err(e) = tailer.new_tailer().await {
                         eprintln!("Failed to init tailer for {:?}: {:?}", tailer.file_path, e);
                         return;
                     }
-                    if let Err(e) = tailer.run_tailer(shutdown_rx).await {
+                    if let Err(e) = tailer.run_tailer(rx).await {
                         eprintln!("Tailer error for {:?}: {:?}", tailer.file_path, e);
                     }
                 });
+
+                self.tailer_handles.push(handle);
+                self.tailer_shutdown_txs.push(tx);
 
                 // If file is new(has no checkpoint), save it
                 if !self.checkpoint.files.contains_key(&path) {
@@ -302,9 +340,6 @@ impl LogWatcher {
                         .save_checkpoint(&self.checkpoint_path, path, inode, 0)
                         .await?;
                 }
-
-                // TODO: Store handle for management (optional)
-                // TODO: self.active_tailers.insert(inode, (handle, shutdown_tx));
             }
         }
 
@@ -344,36 +379,39 @@ impl LogWatcher {
     async fn handle_new_file(&mut self, inode: u64, path: &Path) -> Result<()> {
         if self.active_files.contains_key(&inode) {
             return Ok(());
-        } else {
-            let new_file_path = path.clone().to_path_buf();
-
-            self.active_files.insert(inode, new_file_path);
-
-            let mut tailer = Tailer {
-                file_path: new_file_path.clone(),
-                file_offset: 0,
-                file_handle: String::new(),
-                reader: None,
-                service: Arc::clone(&self.service),
-            };
-
-            tokio::spawn(async move {
-                if let Err(e) = tailer.new_tailer().await {
-                    eprintln!(
-                        "Failed to initialize tailer for {:?}: {:?}",
-                        tailer.file_path, e
-                    );
-                    return;
-                }
-                if let Err(e) = tailer.run_tailer(shutdown_rx).await {
-                    eprintln!("Tailer error for {:?}: {:?}", tailer.file_path, e);
-                }
-            });
-
-            self.checkpoint
-                .save_checkpoint(&self.checkpoint_path, path.to_path_buf(), inode, 0)
-                .await?;
         }
+
+        self.active_files.insert(inode, path.to_path_buf());
+
+        let (tx, rx) = tokio::sync::watch::channel(false);
+
+        let mut tailer = Tailer {
+            file_path: path.to_path_buf(),
+            file_offset: 0,
+            file_handle: String::new(),
+            reader: None,
+            service: Arc::clone(&self.service),
+        };
+
+        let handle = tokio::spawn(async move {
+            if let Err(e) = tailer.new_tailer().await {
+                eprintln!(
+                    "Failed to initialize Tailer for {:?}: {:?}",
+                    tailer.file_path, e
+                );
+                return;
+            }
+            if let Err(e) = tailer.run_tailer(rx).await {
+                eprintln!("Tailer error for {:?}: {:?}", tailer.file_path, e);
+            }
+        });
+
+        self.tailer_handles.push(handle);
+        self.tailer_shutdown_txs.push(tx);
+
+        self.checkpoint
+            .save_checkpoint(&self.checkpoint_path, path.to_path_buf(), inode, 0)
+            .await?;
 
         Ok(())
     }
