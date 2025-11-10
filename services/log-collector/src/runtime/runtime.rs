@@ -11,41 +11,55 @@ use crate::{
 use anyhow::Result;
 use std::path::PathBuf;
 use std::sync::Arc;
-use tokio::{signal, sync::Mutex};
+use tokio::{signal, sync::Mutex, task::JoinHandle};
 use tonic::transport::Server;
 
 pub async fn run_log_collector(config_path: PathBuf) -> Result<()> {
     // TODO: Ensure proper tracing is added for debugging
 
-    // Start metrics server
+    println!("Starting Log Collector runtime...");
+
+    // Initialize global shutdown channel
+    let shutdown = Shutdown::new();
+    let shutdown_signal = shutdown.clone();
+
+    // Start Ctrc+C shutdown signal listener
+    tokio::spawn(async move {
+        signal::ctrl_c()
+            .await
+            .expect("Failed to listen for CTRL+C shutdown signal");
+        println!("CTRL+C shutdown signal detected, broadcasting shutdown...");
+        shutdown_signal.trigger();
+    });
+
+    // Start metrics server (background task)
     tokio::spawn(async {
         start_metrics_server("0.0.0.0:9000").await;
     });
 
-    // Initialize global shutdown channel
-    let shutdown = Shutdown::new();
-
-    // Clone shutdown channel for signal listener
-    let shutdown_signal = shutdown.clone();
-
-    // Load config
+    // Load Log Collector configurations
     println!("Loading configurations...");
     let cfg = Config::load(&config_path)?;
     println!("Configuration loaded successfully...");
 
-    // Initialize log collector components
+    // Initialize Log Collector shared sub-systems
     println!("Initializing Log Collector components...");
+
     let buffer = Arc::new(Mutex::new(InMemoryBuffer::new(cfg.buffer).await));
     let shipper = Shipper::new(cfg.shipper).await;
     let parser = Default::default(); // TODO: Replace with configurable parser, leave as is for now....
+
     println!("Log Collector components initialized successfully...");
 
-    // Create shared LogCollectorService instance
+    // Shared gRPC service state, ensuring both Local and Network modes
+    // share the same state
     let service = Arc::new(LogCollectorService {
         parser,
         buffer_batcher: Arc::clone(&buffer),
         shipper,
     });
+
+    let mut task_handles: Vec<JoinHandle<()>> = Vec::new();
 
     // Spawn local logs watcher (local-mode)
     if cfg.general.enable_local_mode {
@@ -64,7 +78,7 @@ pub async fn run_log_collector(config_path: PathBuf) -> Result<()> {
                 // Subscribe to the global shutdown channel
                 let mut shutdown_rx = shutdown.subscribe();
 
-                tokio::spawn(async move {
+                let handle = tokio::spawn(async move {
                     // Builder function — creates and configures LogWatcher before it starts doing
                     // any work. Takes all parameters controlling how it behaves at runtime.
                     match LogWatcher::new_watcher(
@@ -93,6 +107,8 @@ pub async fn run_log_collector(config_path: PathBuf) -> Result<()> {
                         Err(e) => eprintln!("Failed to start watcher: {e}"),
                     }
                 });
+
+                task_handles.push(handle);
             } else {
                 println!("Local log watcher disabled in [watcher] configuration.");
             }
@@ -112,37 +128,39 @@ pub async fn run_log_collector(config_path: PathBuf) -> Result<()> {
         let addr = "[::1]:50052".parse()?;
         let service_clone = (*service).clone();
 
-        tokio::select! {
-            res = Server::builder()
+        let handle = tokio::spawn(async move {
+            if let Err(e) = Server::builder()
                 .add_service(LogCollectorServer::new(service_clone))
-                .serve(addr) => {
-                    if let Err(e) = res {
-                        eprintln!("gRPC server error: {e}");
-                    }
-                }
-
-            _ = shutdown_rx.recv() => {
-                println!("Shutdown signal received, stopping gRPC server...");
-                // Server::builder() doesn't provide a stop API directly, this just ensures
-                // it exits promptly as serve() is canceled.
+                .serve_with_shutdown(addr, async move {
+                    shutdown_rx.recv().await.ok();
+                    println!("Log Collector gRPC server shutting down gracefully...");
+                })
+                .await
+            {
+                eprintln!("Log Collector gRPC server error: {e}");
             }
-        };
+        });
+
+        task_handles.push(handle);
     } else {
         println!("Network mode disabled in [general] configuration.");
     }
 
-    // Handle system signale
-    tokio::spawn(async move {
-        signal::ctrl_c()
-            .await
-            .expect("Failed to listen for Ctrl+C signal");
-        println!("Ctrl+C signal detected, broadcasting shutdown...");
-        shutdown_signal.trigger();
-    });
-
-    // Await graceful termination
+    // Await shutdown signal
     shutdown.wait_for_shutdown().await;
-    println!("Log Collector successfully shutdown.");
+    println!("Log Collector global shutdown triggered, awaiting components to finish...");
 
+    // Await all task to ensure clean shutdown
+    for handle in task_handles {
+        let _ = handle.await;
+    }
+
+    // Perform final clean up
+    {
+        let mut buf = buffer.lock().await;
+        buf.shutdown().await?;
+    }
+
+    println!("Log COllector successfully shut down.");
     Ok(())
 }
