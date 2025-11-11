@@ -88,9 +88,10 @@ impl Tailer {
                         sleep(Duration::from_millis(100)).await;
                     } else {
                         let mut buffer = self.service.buffer_batcher.lock().await; // Acquire InMemoryBuffer Mutex lock
+                        let shipper = self.service.shipper.lock().await; // Acquire Shipper lock
                         match process_log_line(
                             &mut *buffer,
-                            &self.service.shipper,
+                            &*shipper,
                             line.clone(),
                         )
                         .await {
