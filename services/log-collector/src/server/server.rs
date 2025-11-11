@@ -67,9 +67,10 @@ impl crate::proto::collector::log_collector_server::LogCollector for LogCollecto
                     Ok(raw_log) => {
                         let line = raw_log.raw_line;
                         let mut buffer = log_buffer_batcher.lock().await; // Acquire InMemoryBuffer lock to safely access shared InMemoryBuffer
+                        let shipper = log_shipper.lock().await; // Acquire Shipper lock to safely access it
 
                         // Actual log processing logic
-                        match process_log_line(&mut *buffer, &log_shipper, line.clone()).await {
+                        match process_log_line(&mut *buffer, &*shipper, line.clone()).await {
                             Ok(_) => {
                                 let _ = tx.send(Ok(CollectResponse { accepted: true })).await;
                             }
