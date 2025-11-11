@@ -95,7 +95,7 @@ groups:
     rules:
       # Buffer Flush Failures
       - alert: InMemoryBufferErrors
-        expr: increase(logcollector_buffer_flush_errors_total[5m])) > 0
+        expr: increase(logcollector_buffer_flush_errors_total[5m]) > 0
         for: 1m
         labels:
           severity: critical
