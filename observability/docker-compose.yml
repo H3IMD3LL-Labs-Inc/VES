@@ -6,6 +6,7 @@ services:
       - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
       - ./prometheus/alerts.yml:/etc/prometheus/alerts.yml:ro
       - prometheus_data:/prometheus
+      - /var/run/docker.sock:/var/run/docker.sock
     ports:
       - "9090:9090"
     command:
