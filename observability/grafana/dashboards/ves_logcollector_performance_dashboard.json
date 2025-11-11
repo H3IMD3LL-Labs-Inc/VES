@@ -16,23 +16,18 @@
     ]
   },
   "editable": true,
-  "fiscalYearStartMonth": 0,
   "graphTooltip": 1,
-  "id": null,
-  "links": [],
-  "liveNow": false,
   "panels": [
     {
       "type": "row",
       "title": "Ingestion & Parsing",
       "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 },
-      "collapsed": false,
-      "panels": []
+      "collapsed": false
     },
     {
       "type": "timeseries",
       "title": "Lines Read Total (rate/sec)",
-      "gridPos": { "h": 7, "w": 12, "x": 0, "y": 1 },
+      "gridPos": { "h": 7, "w": 8, "x": 0, "y": 1 },
       "targets": [
         {
           "expr": "rate(logcollector_lines_read_total[1m])",
@@ -43,8 +38,8 @@
     },
     {
       "type": "timeseries",
-      "title": "Log Parsing Duration (p95, seconds)",
-      "gridPos": { "h": 7, "w": 12, "x": 12, "y": 1 },
+      "title": "Log Parsing Duration (p95)",
+      "gridPos": { "h": 7, "w": 8, "x": 8, "y": 1 },
       "targets": [
         {
           "expr": "histogram_quantile(0.95, sum(rate(logcollector_parse_duration_seconds_bucket[1m])) by (le))",
@@ -54,25 +49,27 @@
       ]
     },
     {
-      "type": "timeseries",
-      "title": "Parser Failures (rate/5m)",
-      "gridPos": { "h": 7, "w": 12, "x": 0, "y": 8 },
+      "type": "bargauge",
+      "title": "Parse Failures (5m increase)",
+      "gridPos": { "h": 7, "w": 8, "x": 16, "y": 1 },
+      "options": {
+        "reduceOptions": { "calcs": ["last"], "fields": "", "values": false },
+        "orientation": "horizontal",
+        "displayMode": "gradient",
+        "showUnfilled": false,
+        "thresholds": {
+          "mode": "absolute",
+          "steps": [
+            { "color": "green", "value": null },
+            { "color": "orange", "value": 5 },
+            { "color": "red", "value": 10 }
+          ]
+        }
+      },
       "targets": [
         {
           "expr": "increase(logcollector_parse_failures_total[5m])",
-          "legendFormat": "parse failures",
-          "refId": "A"
-        }
-      ]
-    },
-    {
-      "type": "timeseries",
-      "title": "Parser Backpressure (p95, seconds)",
-      "gridPos": { "h": 7, "w": 12, "x": 12, "y": 8 },
-      "targets": [
-        {
-          "expr": "histogram_quantile(0.95, sum(rate(logcollector_parse_backpressure_duration_seconds_bucket[1m])) by (le))",
-          "legendFormat": "p95 backpressure",
+          "legendFormat": "failures",
           "refId": "A"
         }
       ]
@@ -81,114 +78,58 @@
     {
       "type": "row",
       "title": "Buffer & Shipper",
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 15 },
-      "collapsed": false,
-      "panels": []
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 8 },
+      "collapsed": false
     },
     {
-      "type": "timeseries",
-      "title": "Buffer Flush Duration (p95, seconds)",
-      "gridPos": { "h": 7, "w": 12, "x": 0, "y": 16 },
-      "targets": [
-        {
-          "expr": "histogram_quantile(0.95, sum(rate(logcollector_buffer_flush_duration_seconds_bucket[1m])) by (le))",
-          "legendFormat": "p95 flush",
-          "refId": "A"
-        }
-      ]
-    },
-    {
-      "type": "timeseries",
+      "type": "gauge",
       "title": "Buffer Utilization Ratio",
-      "gridPos": { "h": 7, "w": 12, "x": 12, "y": 16 },
+      "gridPos": { "h": 7, "w": 8, "x": 0, "y": 9 },
+      "options": {
+        "reduceOptions": { "calcs": ["last"], "fields": "", "values": false },
+        "orientation": "horizontal",
+        "showThresholdLabels": false,
+        "showThresholdMarkers": true,
+        "min": 0,
+        "max": 1,
+        "thresholds": {
+          "mode": "percentage",
+          "steps": [
+            { "color": "green", "value": null },
+            { "color": "yellow", "value": 0.75 },
+            { "color": "red", "value": 0.9 }
+          ]
+        }
+      },
       "targets": [
         {
           "expr": "logcollector_buffer_utilization_ratio",
-          "legendFormat": "utilization",
+          "legendFormat": "ratio",
           "refId": "A"
         }
       ]
     },
     {
       "type": "timeseries",
-      "title": "Buffer Size (logs)",
-      "gridPos": { "h": 7, "w": 12, "x": 0, "y": 23 },
+      "title": "Buffer Flush Duration (p95)",
+      "gridPos": { "h": 7, "w": 8, "x": 8, "y": 9 },
       "targets": [
         {
-          "expr": "logcollector_buffer_size",
-          "legendFormat": "buffer size",
+          "expr": "histogram_quantile(0.95, sum(rate(logcollector_buffer_flush_duration_seconds_bucket[1m])) by (le))",
+          "legendFormat": "p95",
           "refId": "A"
         }
       ]
     },
     {
-      "type": "timeseries",
-      "title": "Shipper Duration (p95, seconds)",
-      "gridPos": { "h": 7, "w": 12, "x": 12, "y": 23 },
-      "targets": [
-        {
-          "expr": "histogram_quantile(0.95, sum(rate(logcollector_ship_duration_seconds_bucket[1m])) by (le))",
-          "legendFormat": "p95 ship",
-          "refId": "A"
-        }
-      ]
-    },
-    {
-      "type": "timeseries",
-      "title": "Shipper Queue Depth",
-      "gridPos": { "h": 7, "w": 12, "x": 0, "y": 30 },
-      "targets": [
-        {
-          "expr": "logcollector_ship_queue_depth",
-          "legendFormat": "queue depth",
-          "refId": "A"
-        }
-      ]
-    },
-
-    {
-      "type": "row",
-      "title": "Throughput & Latency",
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 37 },
-      "collapsed": false,
-      "panels": []
-    },
-    {
-      "type": "timeseries",
-      "title": "Throughput (logs/sec)",
-      "gridPos": { "h": 7, "w": 12, "x": 0, "y": 38 },
-      "targets": [
-        {
-          "expr": "logcollector_throughput_logs_per_sec",
-          "legendFormat": "{{instance}}",
-          "refId": "A"
-        }
-      ]
-    },
-    {
-      "type": "timeseries",
-      "title": "End-to-End Latency (p99, ms)",
-      "gridPos": { "h": 7, "w": 12, "x": 12, "y": 38 },
-      "targets": [
-        {
-          "expr": "logcollector_p99_latency_ms",
-          "legendFormat": "{{instance}}",
-          "refId": "A"
-        }
-      ]
-    },
-
-    {
-      "type": "row",
-      "title": "Reliability & Failures",
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 45 },
-      "collapsed": false,
-      "panels": []
-    },
-    {
-      "type": "timeseries",
+      "type": "bargauge",
       "title": "Buffer Flush Errors (5m increase)",
-      "gridPos": { "h": 7, "w": 12, "x": 0, "y": 46 },
+      "gridPos": { "h": 7, "w": 8, "x": 16, "y": 9 },
+      "options": {
+        "reduceOptions": { "calcs": ["last"], "fields": "", "values": false },
+        "orientation": "horizontal",
+        "displayMode": "gradient"
+      },
       "targets": [
         {
           "expr": "increase(logcollector_buffer_flush_errors_total[5m])",
@@ -199,8 +140,43 @@
     },
     {
       "type": "timeseries",
-      "title": "Shipping Failures (5m increase)",
-      "gridPos": { "h": 7, "w": 12, "x": 12, "y": 46 },
+      "title": "Shipper Duration (p95)",
+      "gridPos": { "h": 7, "w": 8, "x": 0, "y": 16 },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, sum(rate(logcollector_ship_duration_seconds_bucket[1m])) by (le))",
+          "legendFormat": "p95 ship",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "type": "gauge",
+      "title": "Shipper Queue Depth",
+      "gridPos": { "h": 7, "w": 8, "x": 8, "y": 16 },
+      "options": {
+        "min": 0,
+        "thresholds": {
+          "mode": "absolute",
+          "steps": [
+            { "color": "green", "value": null },
+            { "color": "yellow", "value": 50 },
+            { "color": "red", "value": 100 }
+          ]
+        }
+      },
+      "targets": [
+        {
+          "expr": "logcollector_ship_queue_depth",
+          "legendFormat": "depth",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "type": "bargauge",
+      "title": "Ship Failures (5m increase)",
+      "gridPos": { "h": 7, "w": 8, "x": 16, "y": 16 },
       "targets": [
         {
           "expr": "increase(logcollector_ship_failures_total[5m])",
@@ -209,78 +185,70 @@
         }
       ]
     },
-    {
-      "type": "timeseries",
-      "title": "Dropped Logs (total)",
-      "gridPos": { "h": 7, "w": 12, "x": 0, "y": 53 },
-      "targets": [
-        {
-          "expr": "logcollector_dropped_logs_total",
-          "legendFormat": "dropped logs",
-          "refId": "A"
-        }
-      ]
-    },
-    {
-      "type": "timeseries",
-      "title": "Average Batch Size",
-      "gridPos": { "h": 7, "w": 12, "x": 12, "y": 53 },
-      "targets": [
-        {
-          "expr": "logcollector_average_batch_size",
-          "legendFormat": "batch size",
-          "refId": "A"
-        }
-      ]
-    },
 
     {
       "type": "row",
-      "title": "System & Lifecycle",
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 60 },
-      "collapsed": false,
-      "panels": []
+      "title": "System Health & Lifecycle",
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 23 },
+      "collapsed": false
     },
     {
-      "type": "timeseries",
-      "title": "CPU Usage (%)",
-      "gridPos": { "h": 7, "w": 12, "x": 0, "y": 61 },
+      "type": "stat",
+      "title": "Collector Up Status",
+      "gridPos": { "h": 6, "w": 6, "x": 0, "y": 24 },
+      "options": {
+        "reduceOptions": {
+          "calcs": ["lastNotNull"],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "center",
+        "thresholds": {
+          "mode": "absolute",
+          "steps": [
+            { "color": "red", "value": 0 },
+            { "color": "green", "value": 1 }
+          ]
+        }
+      },
       "targets": [
         {
-          "expr": "(100 - (avg by (instance) (irate(node_cpu_seconds_total{mode=\"idle\"}[1m])) * 100))",
-          "legendFormat": "CPU %",
+          "expr": "up{job=\"ves-logcollector\"}",
+          "legendFormat": "up",
           "refId": "A"
         }
       ]
     },
     {
-      "type": "timeseries",
-      "title": "Memory Usage (%)",
-      "gridPos": { "h": 7, "w": 12, "x": 12, "y": 61 },
-      "targets": [
-        {
-          "expr": "(node_memory_Active_bytes / node_memory_MemTotal_bytes) * 100",
-          "legendFormat": "Memory %",
-          "refId": "A"
-        }
-      ]
-    },
-    {
-      "type": "timeseries",
+      "type": "stat",
       "title": "Active Async Tasks",
-      "gridPos": { "h": 7, "w": 12, "x": 0, "y": 68 },
+      "gridPos": { "h": 6, "w": 6, "x": 6, "y": 24 },
       "targets": [
         {
           "expr": "logcollector_active_tasks",
-          "legendFormat": "active tasks",
+          "legendFormat": "tasks",
           "refId": "A"
         }
       ]
     },
     {
-      "type": "timeseries",
+      "type": "stat",
+      "title": "Dropped Logs",
+      "gridPos": { "h": 6, "w": 6, "x": 12, "y": 24 },
+      "targets": [
+        {
+          "expr": "logcollector_dropped_logs_total",
+          "legendFormat": "dropped",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "type": "bargauge",
       "title": "Shutdown Invocations & Restarts",
-      "gridPos": { "h": 7, "w": 12, "x": 12, "y": 68 },
+      "gridPos": { "h": 6, "w": 6, "x": 18, "y": 24 },
       "targets": [
         {
           "expr": "increase(logcollector_shutdown_invocations_total[5m])",
@@ -293,37 +261,14 @@
           "refId": "B"
         }
       ]
-    },
-
-    {
-      "type": "row",
-      "title": "Availability",
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 75 },
-      "collapsed": false,
-      "panels": []
-    },
-    {
-      "type": "timeseries",
-      "title": "Collector Up Status",
-      "gridPos": { "h": 7, "w": 12, "x": 0, "y": 76 },
-      "targets": [
-        {
-          "expr": "up{job=\"ves-logcollector\"}",
-          "legendFormat": "up (1=OK)",
-          "refId": "A"
-        }
-      ]
     }
   ],
   "refresh": "10s",
   "schemaVersion": 42,
   "style": "dark",
   "tags": ["ves", "logcollector", "observability"],
-  "templating": { "list": [] },
   "time": { "from": "now-6h", "to": "now" },
-  "timepicker": {},
-  "timezone": "",
-  "title": "VES Log Collector Full Observability",
-  "uid": "ves-logcollector-full",
-  "version": 1
+  "title": "VES Log Collector — Enhanced Observability",
+  "uid": "ves-logcollector-enhanced",
+  "version": 2
 }
