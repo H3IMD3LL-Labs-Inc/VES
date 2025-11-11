@@ -11,27 +11,40 @@ rule_files:
   - "alerts.yml"
 
 scrape_configs:
+  # Prometheus Monitoring Server
   - job_name: "prometheus"
     static_configs:
       - targets: ["prometheus:9090"]
         labels:
           app: "prometheus"
 
+  # Node Exporter
   - job_name: "node-exporter"
     static_configs:
       - targets: ["node-exporter:9100"]
         labels:
           app: "node"
 
+  # Alert Manager
   - job_name: "alertmanager"
     static_configs:
       - targets: ["alertmanager:9093"]
         labels:
           app: "alertmanager"
 
+  # VES Log Collector
   - job_name: "ves-logcollector"
-    scrape_interval: 5s
-    static_configs:
-      - targets: ["host.docker.internal:9000"]
-        labels:
-          app: "logcollector"
+    metrics_path: /metrics
+    docker_sd_configs:
+      - host: unix:///var/run/docker.sock
+        refresh_interval: 5s
+    relabel_configs:
+      # Only keep containers named like "ves-logcollector"
+      - source_labels: [__meta_docker_container_name]
+        regex: "/ves-logcollector"
+        action: keep
+      # Rename instance label to container_name:port
+      - source_labels: [__address__, __meta_docker_container_name]
+        regex: "(.+);/(.+)"
+        target_label: instance
+        replacement: "${2}"
