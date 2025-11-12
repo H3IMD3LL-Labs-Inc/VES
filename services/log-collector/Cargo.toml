@@ -31,6 +31,8 @@ clap.workspace = true
 bytes.workspace = true
 futures.workspace = true
 prost-types.workspace = true
+hdrhistogram.workspace = true
+sysinfo.workspace = true
 
 [build-dependencies]
 tonic-prost-build = "0.14.2"
