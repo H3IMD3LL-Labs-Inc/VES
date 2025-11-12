@@ -5,8 +5,10 @@ use std::collections::HashMap;
 use std::os::unix::fs::MetadataExt;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
+use std::time::Instant;
 use tokio_stream::StreamExt;
 
+use crate::metrics::metrics::SNAPSHOT_RECOVERY_DURATION_SECONDS;
 use crate::server::server::LogCollectorService;
 use crate::tailer::tailer::Tailer;
 
@@ -162,7 +164,13 @@ impl LogWatcher {
             files: HashMap::new(),
         };
 
+        // Measure snapshot recovery duration
+        let recovery_start = Instant::now();
+
         checkpoint.load_checkpoint(&checkpoint_path).await?;
+
+        let recovery_duration = recovery_start.elapsed().as_secs_f64();
+        SNAPSHOT_RECOVERY_DURATION_SECONDS.set(recovery_duration);
 
         Ok(Self {
             log_dir,
