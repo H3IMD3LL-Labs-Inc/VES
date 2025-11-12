@@ -1,210 +1,80 @@
 groups:
-  - name: ves-performance-rules
+  - name: ves-logcollector-performance
     interval: 10s
     rules:
-      # High Log Parsing Latency
-      - alert: HighParsingLatency
-        expr: histogram_quantile(0.95, sum(rate(log_collector_parse_duration_seconds_bucket[1m])) by (le)) > 0.002
-        for: 30s
-        labels:
-          severity: warning
-          category: performance
-        annotations:
-          summary: "High log parsing latency (p95 > 2ms)"
-          description: "The Log Collector parser p95 latency exceeded 2ms for more than 30 seconds."
-
-      # High Log Flush Duration
-      - alert: SlowLogFlushing
-        expr: histogram_quantile(0.95, sum(rate(logcollector_buffer_flush_duration_seconds_bucket[1m])) by (le)) > 0.01
-        for: 1m
-        labels:
-          severity: warning
-          category: performance
-        annotations:
-          summary: "Slow InMemoryBuffer flushing detected"
-          description: "p95 buffer flush duration exceeded 10ms for over 1 minute."
-
-      # High Log Shipping Duration
-      - alert: SlowLogShipping
-        expr: histogram_quantile(0.95, sum(rate(logcollector_ship_duration_seconds_bucket[1m])) by (le)) > 0.02
-        for: 1m
-        labels:
-          severity: warning
-          category: performance
-        annotations:
-          summary: "High Log Shipper latency"
-          description: "p95 shipping latency exceeded 20ms for 1 minute."
-
       # Low Throughput
       - alert: LowThroughput
-        expr: rate(logcollector_processed_logs_total[1m]) < 1000000
+        expr: logcollector_throughtput_logs_per_sec < 800000
         for: 30s
         labels:
           severity: warning
           category: performance
         annotations:
-          summary: "VES Log Collector throughput drop"
-          description: "Throughput has fallen below 1M logs/sec for over 30 seconds."
+          summary: "Low Throughput detected (<800k logs/sec/core)"
+          description: "Sustained throughput dropped below 800k logs/sec/core for over 30s."
 
-      # Slow Local Log Ingestion
-      - alert: SlowTailerInput
-        expr: rate(logcollector_lines_read_total[1m]) < 100
-        for: 2m
+      # High Average Latency
+      - alert: HighAverageLatency
+        expr: (rate(logcollector_process_line_duration_seconds_sum[1m]) / rate(logcollector_process_line_duration_seconds_count[1m])) * 1000 > 0.3
+        for: 1m
         labels:
           severity: warning
-          category: ingestion
+          category: latency
         annotations:
-          summary: "Tailer reading fewer lines than expected"
-          description: "Tailer input rate dropped below 100 lines/sec for 2 minutes."
+          summary: "Average latency exceeds 0.3ms"
+          description: "Average log processing latency exceeded 0.3ms (P99 <1ms expected)."
 
-      # Log Parser blocked due to buffer backpressure
-      - alert: ParserBackpressureDetected
-        expr: histogram_quantile(0.95, sum(rate(logcollector_parse_backpressure_duration_seconds_bucket[1m])) by (le)) > 0.005
+      # High P99 Latency
+      - alert: HighP99Latency
+        expr: logcollector_p99_latency_ms > 1
         for: 30s
         labels:
           severity: warning
-          category: ingestion
+          category: latency
         annotations:
-          summary: "Log parsing blocked due to buffer saturation"
-          description: "p95 log parsing backpressure latency exceeded 5ms for 30 seconds."
+          summary: "P99 latency above 1ms"
+          description: "99th percentile latency exceeded 1ms threshold."
 
-      # InMemoryBuffer approaching capacity
-      - alert: InMemoryBufferUtilizationHigh
-        expr: logcollector_buffer_utilization_ratio > 0.85
-        for: 1m
-        labels:
-          severity: warning
-          category: reliability
-        annotations:
-          summary: "InMemoryBuffer nearing capacity"
-          description: "InMemoryBuffer utilization exceeds 85% for 1 minute — possible backpressure building."
-
-      # Shipper queue saturation
-      - alert: LogShipperQueueCongestion
-        expr: logcollector_ship_queue_depth > 1000
-        for: 1m
-        labels:
-          severity: critical
-          category: performance
-        annotations:
-          summary: "Log Shipper queue congested"
-          description: "Too many log batches waiting to ship; downstream bottleneck detected."
-
-  - name: ves-reliability-rules
-    interval: 10s
-    rules:
-      # Buffer Flush Failures
-      - alert: InMemoryBufferErrors
-        expr: increase(logcollector_buffer_flush_errors_total[5m]) > 0
-        for: 1m
-        labels:
-          severity: critical
-          category: reliability
-        annotations:
-          summary: "InMemoryBuffer errors detected"
-          description: "One or more InMemoryBuffer flush operations failed in the last 5 minutes."
-
-      # Log Parser Failures
-      - alert: ParserErrors
-        expr: increase(logcollector_parse_failures_total[5m]) > 0
-        for: 1m
-        labels:
-          severity: critical
-          category: reliability
-        annotations:
-          summary: "Log parsing error rate detected"
-          description: "Parsing errors occurred during log processing in the last 5 minutes."
-
-      # InMemoryBuffer Growth (Memory Pressure)
-      - alert: InMemoryBufferPressure
-        expr: logcollector_buffer_size > 1000000
+      # High Memory Footprint
+      - alert: HighMemoryUsage
+        expr: (logcollector_memory_bytes / 1024 / 1024) > 45
         for: 2m
         labels:
           severity: warning
           category: memory
         annotations:
-          summary: "InMemoryBuffer too large"
-          description: "InMemoryBuffer size exceeded 1M logs, indicating potential backpressure or slow shipper."
+          summary: "Memory footprint above 45MB"
+          description: "Memory usage exceeded 45MB under sustained load."
 
-      # File rotation handling issues
-      - alert: ExcessiveFileRotations
-        expr: increase(logcollector_file_rotation_total[5m]) > 100
-        for: 5m
-        labels:
-          severity: warning
-          category: ingestion
-        annotations:
-          summary: "Frequent log file rotations"
-          description: "Over 100 log file rotations in 5 minutes — potential log rollover misconfiguration."
-
-      # File descriptor leak
-      - alert: FileDescriptorLeak
-        expr: logcollector_fd_open_total > 10000
-        for: 5m
-        labels:
-          severity: critical
-          category: system
-        annotations:
-          summary: "Too many open file descriptors"
-          description: "Possible handle leak — exceeding 10k open descriptors."
-
-  - name: ves-system-rules
-    interval: 15s
-    rules:
       # High CPU Usage
       - alert: HighCPUUsage
-        expr: (100 - (avg by (instance) (irate(node_cpu_seconds_total{mode="idle"}[1m])) * 100)) > 80
+        expr: logcollector_cpu_percent_per_core > 25
         for: 1m
-        labels:
-          severity: critical
-          category: system
-        annotations:
-          summary: "High CPU Usage"
-          description: "Node CPU utilization >80% for more than 1 minute."
-
-      # High Memory Usage
-      - alert: HighMemoryUsage
-        expr: (node_memory_Active_bytes / node_memory_MemTotal_bytes) * 100 > 85
-        for: 1m
-        labels:
-          severity: critical
-          category: system
-        annotations:
-          summary: "High Memory Usage"
-          description: "Node memory usage >85% for over 1 minute."
-
-  - name: ves-availability-rules
-    interval: 10s
-    rules:
-      # Log Collector Down
-      - alert: LogCollectorDown
-        expr: up{job="ves-logcollector"} == 0
-        for: 10s
-        labels:
-          severity: critical
-          category: availability
-        annotations:
-          summary: "Log Collector is unreachable."
-          description: "Prometheus failed to scrape the /metrics endpoint."
-
-      # Unexpected Shutdowns
-      - alert: UnexpectedShutdowns
-        expr: increase(logcollector_shutdown_invocations_total[5m]) > 0
-        for: 10s
         labels:
           severity: warning
-          category: availability
+          category: cpu
         annotations:
-          summary: "Log Collector shutdown observed"
-          description: "A clean shutdown occurred in the last 5 minutes — verify it was intentional."
+          summary: "CPU Usage per core above 25%"
+          description: "CPU Utilization exceeded 25% per core threshold."
 
-      # Frequent Log Collector Restarts
-      - alert: LogCollectorFrequentRestarts
-        expr: increase(logcollector_restarts_total[10m]) > 3
-        for: 10m
+      # Slow Cold Start
+      - alert: SlowColdStart
+        expr: logcollector_startup_duration_seconds * 1000 > 80
+        for: 30s
         labels:
-          severity: critical
-          category: stability
+          severity: warning
+          category: startup
         annotations:
-          summary: "Log Collector restarting repeatedly"
-          description: "More than 3 restarts in 10 minutes — check systemd or orchestrator logs."
+          summary: "Cold start too slow (>80ms)"
+          description: "Startup time exceeded 80ms. Check initialization bottlenecks."
+
+      # Slow Snapshot Recovery
+      - alert: SlowSnapshotRecovery
+        expr: logcollector_snapshot_recovery_duration_seconds * 1000 > 350
+        for: 30s
+        labels:
+          severity: warning
+          category: recovery
+        annotations:
+          summary: "Snapshot recovery slower than expected (>350ms)"
+          description: "Snapshot restoration exceeded 350ms threshold — verify storage latency."
