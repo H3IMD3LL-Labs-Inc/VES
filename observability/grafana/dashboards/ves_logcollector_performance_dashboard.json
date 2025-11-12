@@ -39,6 +39,8 @@
         }
       ],
       "options": {
+        "min": 0,
+        "max": 1000000,
         "thresholds": {
           "mode": "absolute",
           "steps": [
@@ -59,6 +61,8 @@
         }
       ],
       "options": {
+        "min": 0,
+        "max": 1.5,
         "thresholds": {
           "mode": "absolute",
           "steps": [
@@ -79,6 +83,8 @@
         }
       ],
       "options": {
+        "min": 0,
+        "max": 1.5,
         "thresholds": {
           "mode": "absolute",
           "steps": [
@@ -99,6 +105,8 @@
         }
       ],
       "options": {
+        "min": 0,
+        "max": 100,
         "thresholds": {
           "mode": "absolute",
           "steps": [
@@ -119,6 +127,8 @@
         }
       ],
       "options": {
+        "min": 0,
+        "max": 100,
         "thresholds": {
           "mode": "absolute",
           "steps": [
@@ -139,6 +149,8 @@
         }
       ],
       "options": {
+        "min": 10,
+        "max": 200,
         "thresholds": {
           "mode": "absolute",
           "steps": [
@@ -159,6 +171,8 @@
         }
       ],
       "options": {
+        "min": 100,
+        "max": 1000,
         "thresholds": {
           "mode": "abosolute",
           "steps": [
