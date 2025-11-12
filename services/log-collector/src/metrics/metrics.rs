@@ -20,6 +20,14 @@ lazy_static! {
         "Sustained throughput of logs processed per core per second"
     ).unwrap();
 
+    /// Logs processed every second
+    ///
+    /// This static ref is internal, for use to obtain THROUGHPUT_LOGS_PER_SEC
+    pub static ref LOGS_PROCESSED_THIS_SECOND: Counter = register_counter!(
+        "logcollector_logs_processed_this_second_total",
+        "Temporary counter for logs processed within a current 1-second window"
+    ).unwrap();
+
     /// Average processing latency (derived from process_line_duration histogram)
     pub static ref PROCESS_LINE_DURATION_SECONDS: Histogram = register_histogram!(
         "logcollector_process_line_duration_seconds",
