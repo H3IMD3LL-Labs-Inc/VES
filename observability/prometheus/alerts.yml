@@ -15,7 +15,7 @@ groups:
 
       # High Average Latency
       - alert: HighAverageLatency
-        expr: (rate(logcollector_process_line_duration_seconds_sum[1m]) / rate(logcollector_process_line_duration_seconds_count[1m]) * 1000 > 0.3
+        expr: (rate(logcollector_process_line_duration_seconds_sum[1m]) / rate(logcollector_process_line_duration_seconds_count[1m])) * 1000 > 0.3
         for: 1m
         labels:
           severity: warning
