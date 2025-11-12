@@ -1,7 +1,12 @@
 use crate::{
     buffer_batcher::log_buffer_batcher::InMemoryBuffer,
+    helpers::log_processing::LAT_HISTOGRAM,
     helpers::{load_config::Config, shutdown::Shutdown},
     metrics::http::start_metrics_server,
+    metrics::metrics::{
+        CPU_PERCENT_PER_CORE, LOGS_PROCESSED_THIS_SECOND, MEMORY_BYTES, P99_LATENCY_MS,
+        STARTUP_DURATION_SECONDS, THROUGHPUT_LOGS_PER_SEC,
+    },
     proto::collector::log_collector_server::LogCollectorServer,
     server::server::LogCollectorService,
     shipper::shipper::Shipper,
@@ -11,13 +16,17 @@ use crate::{
 use anyhow::Result;
 use std::path::PathBuf;
 use std::sync::Arc;
+use std::time::Instant;
+use sysinfo::System;
 use tokio::{signal, sync::Mutex, task::JoinHandle};
 use tonic::transport::Server;
 
 pub async fn run_log_collector(config_path: PathBuf) -> Result<()> {
     // TODO: Ensure proper tracing is added for debugging
-
     println!("Starting Log Collector runtime...");
+
+    // Start measuring cold start time
+    let cold_startup_start = Instant::now();
 
     // Initialize global shutdown channel
     let shutdown = Shutdown::new();
@@ -40,6 +49,86 @@ pub async fn run_log_collector(config_path: PathBuf) -> Result<()> {
                 _ = start_metrics_server("0.0.0.0:9000") => {},
                 _ = shutdown_rx.recv() => {
                     println!("Metrics server shutting down...");
+                }
+            }
+        }
+    });
+
+    // Start log throughput auto-refresh background task
+    tokio::spawn({
+        let mut shutdown_rx = shutdown.subscribe();
+        async move {
+            loop {
+                tokio::select! {
+                    _ = shutdown_rx.recv() => {
+                        println!("Logs Throughput updater shutting down...");
+                        break;
+                    }
+                    _ = tokio::time::sleep(std::time::Duration::from_secs(1)) => {
+                        // Get number of logs processed this second
+                        let logs_processed_this_second = LOGS_PROCESSED_THIS_SECOND.get();
+
+                        // Update throughput gauge
+                        THROUGHPUT_LOGS_PER_SEC.set(logs_processed_this_second);
+
+                        // Reset counter
+                        LOGS_PROCESSED_THIS_SECOND.reset();
+                    }
+                }
+            }
+        }
+    });
+
+    // Start p99 latency auto-refresh background task
+    tokio::spawn({
+        let mut shutdown_rx = shutdown.subscribe();
+        async move {
+            loop {
+                tokio::select! {
+                    _ = shutdown_rx.recv() => {
+                        println!("P99 latency updater shutting down...");
+                        break;
+                    }
+                    _ = tokio::time::sleep(std::time::Duration::from_secs(1)) => {
+                        let mut hist = LAT_HISTOGRAM.lock().unwrap();
+                        if hist.len() > 0 {
+                            let p99_ms = hist.value_at_quantile(0.99) as f64 / 1000.0;
+                            P99_LATENCY_MS.set(p99_ms);
+                            hist.reset();
+                        }
+                    }
+                }
+            }
+        }
+    });
+
+    // Start memory and CPU usage auto-refresh background task
+    tokio::spawn({
+        let mut shutdown_rx = shutdown.subscribe();
+        async move {
+            let mut sys = System::new_all();
+            loop {
+                tokio::select! {
+                    _ = shutdown_rx.recv() => {
+                        println!("System metrics updater shutting down...");
+                        break;
+                    }
+                    _ = tokio::time::sleep(std::time::Duration::from_secs(5)) => {
+                        sys.refresh_all();
+
+                        // Memory (bytes)
+                        let mem_bytes = sys.used_memory() * 1024; // Convert KiB -> bytes
+                        MEMORY_BYTES.set(mem_bytes as f64);
+
+                        // Average CPU load across all cores
+                        let avg_cpu = sys.cpus()
+                            .iter()
+                            .map(|cpu| cpu.cpu_usage() as f64)
+                            .sum::<f64>() / sys.cpus().len() as f64;
+                        CPU_PERCENT_PER_CORE.set(avg_cpu);
+
+                        println!("CPU: {:.1}%  MEM: {:.2} MB", avg_cpu, mem_bytes as f64 / 1_000_000.0);
+                    }
                 }
             }
         }
@@ -154,6 +243,14 @@ pub async fn run_log_collector(config_path: PathBuf) -> Result<()> {
     } else {
         println!("Network mode disabled in [general] configuration.");
     }
+
+    // Record cold start duratiion in seconds
+    let cold_startup_duration = cold_startup_start.elapsed().as_secs_f64();
+    STARTUP_DURATION_SECONDS.set(cold_startup_duration);
+    println!(
+        "Cold start completed in {:.2}ms",
+        cold_startup_duration * 1000.0
+    );
 
     // Await shutdown signal
     shutdown.wait_for_shutdown().await;
