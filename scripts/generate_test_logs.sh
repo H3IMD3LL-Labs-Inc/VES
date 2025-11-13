@@ -53,7 +53,7 @@ while true; do
     if (( $(awk -v r=$RANDOM -v p=$BURST_PROBABILITY 'BEGIN {print (r/32767 < p)}') )); then
         RATE=$((THROUGHPUT_PER_SECOND * 2))
     else
-        RATEE=$THROUGHPUT_PER_SECOND
+        RATE=$THROUGHPUT_PER_SECOND
     fi
 
     for ((i=0; i<RATE/5; i++)); do
