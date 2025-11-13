@@ -35,16 +35,20 @@ scrape_configs:
   # VES Log Collector
   - job_name: "ves-logcollector"
     metrics_path: /metrics
-    docker_sd_configs:
-      - host: unix:///var/run/docker.sock
-        refresh_interval: 5s
-    relabel_configs:
-      # Only keep containers named like "ves-logcollector"
-      - source_labels: [__meta_docker_container_name]
-        regex: "/ves-logcollector"
-        action: keep
-      # Rename instance label to container_name:port
-      - source_labels: [__address__, __meta_docker_container_name]
-        regex: "(.+);/(.+)"
-        target_label: instance
-        replacement: "${2}"
+    # TODO: Configure this based on observability stack and VES instance setup..
+    static_configs:
+      - targets:
+          - "172.31.26.255:9000"
+#    docker_sd_configs:
+#      - host: unix:///var/run/docker.sock
+#        refresh_interval: 5s
+#    relabel_configs:
+#      # Only keep containers named like "ves-logcollector"
+#      - source_labels: [__meta_docker_container_name]
+#        regex: "/ves-logcollector"
+#        action: keep
+#      # Rename instance label to container_name:port
+#      - source_labels: [__address__, __meta_docker_container_name]
+#        regex: "(.+);/(.+)"
+#        target_label: instance
+#        replacement: "${2}"
