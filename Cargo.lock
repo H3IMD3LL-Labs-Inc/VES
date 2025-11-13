@@ -448,10 +448,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "48c757948c5ede0e46177b7add2e67155f70e33c07fea8284df6576da70b3719"
 
 [[package]]
-name = "embedding-service"
-version = "0.1.0"
-
-[[package]]
 name = "encoding_rs"
 version = "0.8.35"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1030,42 +1026,6 @@ name = "log"
 version = "0.4.28"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "34080505efa8e45a4b816c349525ebe327ceaa8559756f0356cba97ef3bf7432"
-
-[[package]]
-name = "log-collector"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "bytes",
- "chrono",
- "clap",
- "config",
- "futures",
- "hdrhistogram",
- "http-body-util",
- "hyper",
- "hyper-util",
- "lazy_static",
- "notify",
- "prometheus",
- "prost",
- "prost-types",
- "r2d2",
- "r2d2_sqlite",
- "rand",
- "regex",
- "rusqlite",
- "serde",
- "serde_json",
- "sysinfo",
- "thiserror 2.0.17",
- "tokio",
- "tokio-stream",
- "toml",
- "tonic",
- "tonic-prost",
- "tonic-prost-build",
-]
 
 [[package]]
 name = "matchit"
@@ -2215,6 +2175,42 @@ name = "version_check"
 version = "0.9.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0b928f33d975fc6ad9f86c8f283853ad26bdd5b10b7f1542aa2fa15e2289105a"
+
+[[package]]
+name = "ves"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "bytes",
+ "chrono",
+ "clap",
+ "config",
+ "futures",
+ "hdrhistogram",
+ "http-body-util",
+ "hyper",
+ "hyper-util",
+ "lazy_static",
+ "notify",
+ "prometheus",
+ "prost",
+ "prost-types",
+ "r2d2",
+ "r2d2_sqlite",
+ "rand",
+ "regex",
+ "rusqlite",
+ "serde",
+ "serde_json",
+ "sysinfo",
+ "thiserror 2.0.17",
+ "tokio",
+ "tokio-stream",
+ "toml",
+ "tonic",
+ "tonic-prost",
+ "tonic-prost-build",
+]
 
 [[package]]
 name = "walkdir"

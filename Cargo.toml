@@ -1,6 +1,5 @@
 [workspace]
 members = [
-    "services/embedding-service",
     "services/log-collector",
 ]
 
