@@ -5,9 +5,16 @@ use std::path::PathBuf;
 
 #[derive(Parser)]
 #[command(
-    name = "ves_log_collector",
+    name = "ves",
+    long_about = "VES is a high-performance, pluggable log collector built for performance and compute optimization.",
+    about = "The High Performance Log Collector",
     version,
-    about = "High Performance Log Collector Daemon"
+    term_width = 100,
+    color = clap::ColorChoice::Always,
+    after_help = "\
+    EXAMPLES:
+        ves run --config /etc/log_collector.toml
+        ves validate --config ./your_config.toml"
 )]
 struct Cli {
     #[command(subcommand)]
@@ -16,7 +23,7 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Commands {
-    /// Run log collector in normal mode(Daemon)
+    /// Run log collector
     Run {
         #[arg(short, long, default_value = "/etc/log_collector.toml")]
         config: PathBuf,
