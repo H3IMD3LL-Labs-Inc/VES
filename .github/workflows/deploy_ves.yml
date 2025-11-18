@@ -1,0 +1,46 @@
+name: Build and Deploy VES to EC2 test environment
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: stable
+          override: false
+
+      - name: Build release binary
+        run: cargo build --release --locked
+
+      - name: Prepare binary for deployment to EC2
+        run: cp target/release/ves ves.new
+
+      - name: Copy binary to EC2
+        uses: appleboy/scp-action@v0.1.2
+        with:
+          host: $ {{ secrets.EC2_HOST }}
+          username: ec2-user
+          key: ${{ secrets.EC2_SSH_KEY }}
+          port: 22
+          source: "ves.new"
+          target: "/home/ec2-user/ves/ves.new"
+
+      - name: Update VES binary on EC2
+        uses: appleboy/scp-action@v0.1.2
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ec2-user
+          key: ${{ secrets.EC2_SSH_KEY }}
+          port: 22
+          script: |
+            /home/ec2-user/scripts/deploy_and_restart_ves.sh
