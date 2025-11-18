@@ -24,3 +24,5 @@ sudo chmod +x "$TARGET_BINARY"
 
 echo "Deployment complete..."
 echo "You can now run 'ves run' to run the new binary..."
+
+# Test PR...
