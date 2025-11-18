@@ -2,7 +2,7 @@
 set -e
 
 # Paths
-DEPLOY_DIR="$HOME/ves"
+DEPLOY_DIR="/home/ec2-user/ves"
 NEW_BINARY="$DEPLOY_DIR/ves.new"
 TARGET_BINARY="/usr/local/bin/ves"
 BACKUP_DIR="$DEPLOY_DIR/backups"
