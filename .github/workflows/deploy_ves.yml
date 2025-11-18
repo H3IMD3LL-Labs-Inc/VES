@@ -12,6 +12,9 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      - name: Install protoc
+        run: sudo apt-get update && sudo apt-get install -y protobuf-compiler
+
       - name: Install Rust
         uses: actions-rs/toolchain@v1
         with:
@@ -26,9 +29,9 @@ jobs:
         run: cp target/release/ves ves.new
 
       - name: Copy binary to EC2
-        uses: appleboy/scp-action@v0.1.2
+        uses: appleboy/scp-action@v1.0.0
         with:
-          host: $ {{ secrets.EC2_HOST }}
+          host: ${{ secrets.EC2_HOST }}
           username: ec2-user
           key: ${{ secrets.EC2_SSH_KEY }}
           port: 22
@@ -36,11 +39,12 @@ jobs:
           target: "/home/ec2-user/ves/ves.new"
 
       - name: Update VES binary on EC2
-        uses: appleboy/scp-action@v0.1.2
+        uses: appleboy/ssh-action@v1.2.3
         with:
           host: ${{ secrets.EC2_HOST }}
           username: ec2-user
           key: ${{ secrets.EC2_SSH_KEY }}
           port: 22
           script: |
+            chmod +x /home/ec2-user/scripts/deploy_and_restart_ves.sh
             /home/ec2-user/scripts/deploy_and_restart_ves.sh
