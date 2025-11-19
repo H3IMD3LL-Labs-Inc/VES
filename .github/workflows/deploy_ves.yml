@@ -36,7 +36,7 @@ jobs:
           key: ${{ secrets.EC2_SSH_KEY }}
           port: 22
           source: "ves.new"
-          target: "/home/ec2-user/ves/ves.new"
+          target: "/home/ec2-user/ves"
 
       - name: Update VES binary on EC2
         uses: appleboy/ssh-action@v1.2.3

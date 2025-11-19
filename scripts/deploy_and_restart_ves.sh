@@ -1,7 +1,6 @@
 #!/usr/bin/env bash
 set -e
 
-# Paths
 DEPLOY_DIR="/home/ec2-user/ves"
 NEW_BINARY="$DEPLOY_DIR/ves.new"
 TARGET_BINARY="/usr/local/bin/ves"
@@ -10,11 +9,17 @@ BACKUP_DIR="$DEPLOY_DIR/backups"
 # Ensure backup directory exists
 mkdir -p "$BACKUP_DIR"
 
+# Ensure new VES binary exists
+if [ ! -f "$NEW_BINARY" ]; then
+    echo "ERROR: $NEW_BINARY does not exist. Aborting."
+    exit 1
+fi
+
 # Backup existing binary if it exists
 if [ -f "$TARGET_BINARY" ]; then
     TIMESTAMP=$(date +%Y%m%d%H%M%S)
     echo "Backing up existing binary to $BACKUP_DIR/ves.$TIMESTAMP"
-    mv "$TARGET_BINARY" "$BACKUP_DIR/ves.$TIMESTAMP"
+    sudo mv "$TARGET_BINARY" "$BACKUP_DIR/ves.$TIMESTAMP"
 fi
 
 # Move new binary into place
@@ -24,5 +29,3 @@ sudo chmod +x "$TARGET_BINARY"
 
 echo "Deployment complete..."
 echo "You can now run 'ves run' to run the new binary..."
-
-# Test PR...
