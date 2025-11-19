@@ -17,10 +17,13 @@ capacity_option = "unbounded"                               # Options: bounded, 
 buffer_capacity = 10000
 batch_size = 200
 batch_timeout_ms = 500
-durability = "in-memory"                                    # Options: in-memory, persistent => { sqlite = "parsed_log_buffer.db" }
 overflow_policy = "drop_oldest"                             # Options: drop_oldest, drop_newest, block_with_backpressure, grow_capacity
 flush_policy = "batch_size"                                 # Options: batch_size, batch_timeout, hybrid_size_timeout, on_demand(coming soon)
 drain_policy = "batch_size"                                 # Options: drain_batch_size, drain_batch_timeout, drain_batch_size_timeout, drain_all
+
+[buffer.durability]
+type = "s-q-lite"                                           # Options: in-memory, s-q-lite
+path = "/var/ves-sqlite-db/parsed_log_buffer.db"
 
 [shipper]
 embedder_target_addr = "https://127.0.0.1:50051"            # gRPC address of Embedding Service
