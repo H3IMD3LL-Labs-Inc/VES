@@ -28,6 +28,14 @@ struct DockerLog {
     time: String,
 }
 
+#[derive(Debug, Deserialize)]
+struct ArbitraryJsonSchema {
+    pub time: String,
+    pub level: Option<String>,
+    pub msg: Option<String>,
+    pub message: Option<String>,
+}
+
 /// Define parser supported log formats
 #[derive(Debug)]
 enum LogFormat {
@@ -61,17 +69,28 @@ impl NormalizedLog {
     ///
     /// Returns a [`LogFormat`] enum describing the detected type.
     pub async fn detect_format(line: &str) -> LogFormat {
-        let cri_re =
-            Regex::new(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d+Z (stdout|stderror) [FP]")
-                .unwrap();
+        let line = line.trim_start();
+
+        let cri_re = Regex::new(
+            r"^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}\.[0-9]+Z (stdout|stderr) [FP]",
+        )
+        .unwrap();
+
         if cri_re.is_match(line) {
             return LogFormat::CRI;
         }
 
-        if let Ok(log) = serde_json::from_str::<serde_json::Value>(line) {
+        if let Ok(log) = serde_json::from_slice::<serde_json::Value>(line.as_bytes()) {
+            if !line.trim().starts_with('{') || !line.trim().ends_with('}') {
+                // not a clean JSON object, treat as unknown
+            } else {
+                return LogFormat::DockerJSON;
+            }
+
             if log.get("log").is_some() && log.get("time").is_some() {
                 return LogFormat::DockerJSON;
-            } else {
+            }
+            if log.get("time").is_some() {
                 return LogFormat::ArbitraryJSON;
             }
         }
@@ -209,15 +228,16 @@ impl NormalizedLog {
     pub async fn arbitrary_json_parser(line: &str) -> Result<NormalizedLog, String> {
         match Self::detect_format(line).await {
             LogFormat::ArbitraryJSON => {
-                let parts: Vec<&str> = line.splitn(4, ' ').collect();
+                let parsed: ArbitraryJsonSchema = serde_json::from_str(line)
+                    .map_err(|e| format!("Arbitrary JSON parse failed: {}", e))?;
 
-                let timestamp = DateTime::from_str(parts[0]).unwrap_or_else(|_| Utc::now());
-                let level = Some(parts[1].to_string());
-                let message = parts[2].to_string();
+                let timestamp = DateTime::from_str(&parsed.time).unwrap_or_else(|_| Utc::now());
+
+                let message = parsed.msg.or(parsed.message).unwrap_or_default();
 
                 Ok(NormalizedLog {
                     timestamp,
-                    level,
+                    level: parsed.level,
                     message,
                     metadata: None,
                     raw_line: line.to_string(),
