@@ -2,11 +2,11 @@
 
 # -------------------- CONFIG ---------------------
 PID_FILE="/tmp/generate_test_logs.pid"
-LOG_DIR="/var/log/testlogs"
-GENERATOR_LOG="$LOG_DIR/generator.log"
+LOG_DIR="/var/log/testlogs/actuallogs"
+GENERATOR_LOG="/var/log/testlogs/generator.log"
 MAX_LOG_SIZE_MB=100                  # Rotate log after this size
 MAX_JOBS=20                          # Limit concurrent background jobs
-THROUGHPUT_PER_SECOND=500_000        # Base log generation rate
+THROUGHPUT_PER_SECOND=500000        # Base log generation rate
 BURST_PROBABILITY=0.1
 SLEEP_BASE_MICROS=500
 
@@ -26,14 +26,17 @@ SYSLOG_RFC3164_LOG="$LOG_DIR/syslog_3164.log"
 SYSLOG_RFC5424_LOG="$LOG_DIR/syslog_5424.log"
 
 # -------------------- TIMESTAMP HELPERS ---------------------
-iso8601() { date -u +"%Y-%m-%dT%H:%M:%S.%3NZ"; }
+# Nanosecond precision (required for CRI, Docker, JSON log formats)
+iso8601() { date -u +"%Y-%m-%dT%H:%M:%S.%NZ"; }
+
 rfc3164_ts() { date -u +"%b %d %H:%M:%S"; }
 
 # -------------------- LOG ROTATION ---------------------
 rotate_log() {
     local file=$1
     if [[ -f "$file" ]]; then
-        local size_mb=$(du -m "$file" | cut -f1)
+        local size_mb
+        size_mb=$(du -m "$file" | cut -f1)
         if (( size_mb >= MAX_LOG_SIZE_MB )); then
             mv "$file" "$file.$(date +%Y%m%d%H%M%S)"
             touch "$file"
@@ -48,14 +51,15 @@ generate_cri() {
 }
 
 generate_docker_json() {
-    printf '{"log":"Processing event ID=%d,"stream":"stdout","time":"%s"}\n' "$RANDOM" "$(iso8601)"
+    printf '{"log":"Processing event ID=%d","stream":"stdout","time":"%s"}\n' \
+        "$RANDOM" "$(iso8601)"
 }
 
 generate_arbitrary_json() {
-    printf '{"level":"%s","component":"%s","msg":"event id=%d occurred","timestamp":"%s"}\n' \
+    printf '{"time":"%s","level":"%s","msg":"event id=%d occurred"}\n' \
+        "$(iso8601)" \
         "$(shuf -e INFO WARN ERROR DEBUG | head -1)" \
-        "$(shuf -e auth net db fs io | head -1)" \
-        "$RANDOM" "$(iso8601)"
+        "$RANDOM"
 }
 
 generate_syslog_rfc3164() {
@@ -63,7 +67,7 @@ generate_syslog_rfc3164() {
 }
 
 generate_syslog_rfc5424() {
-    echo "<165>1 $(iso8601) testhost app 1234 ID47 [exampleSDID@32473 iut\"3\" eventSource=\"app\" eventID=\"$RANDOM\"] Sample RFC5424 syslog"
+    echo "<165>1 $(iso8601) testhost app 1234 ID47 [exampleSDID@32473 iut=\"3\" eventSource=\"app\" eventID=\"$RANDOM\"] Sample RFC5424 syslog"
 }
 
 # -------------------- MAIN GENERATOR LOOP -------------------
@@ -109,8 +113,8 @@ run_generator() {
 
 # -------------------- CONTROL FUNCTIONS -------------------
 start_generator() {
-    if [[ -f "$PID_FILE" ]] && kill -0 "$(cat $PID_FILE)" 2>/dev/null; then
-        warn "Already running (PID $(cat $PID_FILE))"
+    if [[ -f "$PID_FILE" ]] && kill -0 "$(cat "$PID_FILE")" 2>/dev/null; then
+        warn "Already running (PID $(cat "$PID_FILE"))"
         exit 0
     fi
 
