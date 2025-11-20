@@ -2,6 +2,7 @@ use bytes::Bytes;
 use http_body_util::Full;
 use hyper::{
     body::Incoming,
+    header::CONTENT_TYPE,
     http::{Method, Request, Response, StatusCode},
     service::service_fn,
 };
@@ -19,7 +20,12 @@ async fn metrics_handler(_req: Request<Incoming>) -> Result<Response<Full<Bytes>
     let mut buffer = Vec::new();
     encoder.encode(&metrics_families, &mut buffer).unwrap();
 
-    Ok(Response::new(Full::new(Bytes::from(buffer))))
+    let content_type = encoder.format_type().to_string();
+
+    Ok(Response::builder()
+        .header(CONTENT_TYPE, content_type)
+        .body(Full::new(Bytes::from(buffer)))
+        .unwrap())
 }
 
 pub async fn start_metrics_server(addr: &str) {
