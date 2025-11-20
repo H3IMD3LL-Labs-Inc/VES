@@ -81,13 +81,8 @@ impl NormalizedLog {
         }
 
         if let Ok(log) = serde_json::from_slice::<serde_json::Value>(line.as_bytes()) {
-            if !line.trim().starts_with('{') || !line.trim().ends_with('}') {
-                // not a clean JSON object, treat as unknown
-            } else {
-                return LogFormat::DockerJSON;
-            }
-
-            if log.get("log").is_some() && log.get("time").is_some() {
+            if log.get("log").is_some() && log.get("stream").is_some() && log.get("time").is_some()
+            {
                 return LogFormat::DockerJSON;
             }
             if log.get("time").is_some() {
