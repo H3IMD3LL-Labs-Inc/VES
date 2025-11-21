@@ -1897,6 +1897,7 @@ dependencies = [
  "slab",
  "socket2",
  "tokio-macros",
+ "tracing",
  "windows-sys 0.59.0",
 ]
 
