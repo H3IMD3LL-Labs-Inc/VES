@@ -2,8 +2,7 @@ use std::panic;
 use tracing::error;
 use tracing_appender::rolling;
 use tracing_error::ErrorLayer;
-use tracing_subscriber::filter::EnvFilter;
-use tracing_subscriber::fmt::Fmt;
+use tracing_subscriber::{filter::EnvFilter, fmt, prelude::*, registry::Registry};
 
 pub fn init_tracing() {
     let file_appender = rolling::daily("/var/log/ves", "ves_runtime.log");

@@ -10,6 +10,7 @@ tracing.workspace = true
 tracing-subscriber.workspace = true
 tracing-appender.workspace = true
 tracing-error.workspace = true
+console-subscriber.workspace = true
 tokio-stream.workspace = true
 notify.workspace = true
 serde.workspace = true
