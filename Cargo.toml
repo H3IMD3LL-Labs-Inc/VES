@@ -10,7 +10,12 @@ serde_json = "1.0.143"
 toml = "0.9.5"
 regex = "1.11.2"
 chrono = { version = "0.4.42", features = ["serde"] }
-tokio = { version = "1", features = ["full"] }
+tokio = { version = "1", features = ["full", "tracing"] }
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["fmt", "std", "time", "registry", "json"] }
+tracing-appender = "0.2"
+tracing-error = "0.2.1"
+console-subscriber = "0.5.0"
 tokio-stream = "0.1.17"
 notify = { version = "8.1.0", features = ["serde"] }
 r2d2 = "0.8.10"
