@@ -22,7 +22,12 @@ pub struct Config {
 
 impl Config {
     /// Load and parse the configuration file
-    #[instrument(name = "config_loader", level = "trace", skip_all)]
+    #[instrument(
+        name = "config_loader",
+        target = "helpers::load_config",
+        level = "trace",
+        skip_all
+    )]
     pub fn load<P: AsRef<Path>>(path: P) -> Result<Self> {
         let path_ref = path.as_ref();
 
