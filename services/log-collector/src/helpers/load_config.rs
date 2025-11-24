@@ -1,7 +1,9 @@
+// External crates
 use anyhow::{Context, Result};
 use serde::Deserialize;
 use std::fs;
 use std::path::Path;
+use tracing::instrument;
 
 #[derive(Debug, Deserialize, Clone)]
 pub struct GeneralConfig {
@@ -20,13 +22,33 @@ pub struct Config {
 
 impl Config {
     /// Load and parse the configuration file
+    #[instrument(name = "config_loader", level = "trace", skip_all)]
     pub fn load<P: AsRef<Path>>(path: P) -> Result<Self> {
         let path_ref = path.as_ref();
 
-        let config_str = fs::read_to_string(path_ref)
-            .with_context(|| format!("Faield to read config file at {:?}", path_ref))?;
-        let config: Config = toml::from_str(&config_str)
-            .with_context(|| format!("Failed to parse TOML from {:?}", path_ref))?;
+        tracing::trace!(
+            configuration_file_path = %path_ref.display(),
+            "Loading VES configuration file"
+        );
+
+        let config_str = match fs::read_to_string(path_ref) {
+            Ok(s) => s,
+            Err(e) => {
+                tracing::error!(error = %e, "Failed to read configuration file");
+                return Err(e)
+                    .with_context(|| format!("Failed to read config file at {:?}", path_ref))?;
+            }
+        };
+        let config: Config = match toml::from_str(&config_str) {
+            Ok(cfg) => cfg,
+            Err(e) => {
+                tracing::error!(error = %e, "Failed to parse TOML configuration");
+                return Err(e)
+                    .with_context(|| format!("Failed to parse TOML from {:?}", path_ref))?;
+            }
+        };
+
+        tracing::trace!(configuration_file_path = %path_ref.display(), "VES configuration file loaded successfully");
         Ok(config)
     }
 }
