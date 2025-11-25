@@ -354,7 +354,7 @@ impl LogWatcher {
                     self.discover_new_files().await?;
                 }
                 Ok(_) = shutdown_rx.recv() => {
-                    tracing::warn!("Running LogWatcher received shutdown signal");
+                    tracing::trace!("Running LogWatcher received shutdown signal");
                     self.shutdown().await;
                     break;
                 }

@@ -1,3 +1,10 @@
+// Local crates
+use crate::{
+    buffer_batcher::log_buffer_batcher::InMemoryBuffer, helpers::log_processing::process_log_line,
+    parser::parser::NormalizedLog, server::server::LogCollectorService, shipper::shipper::Shipper,
+};
+
+// External crates
 use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
@@ -7,12 +14,7 @@ use tokio::io::{self, AsyncBufReadExt, BufReader};
 use tokio::io::{AsyncSeekExt, SeekFrom};
 use tokio::sync::Mutex;
 use tokio::time::{Duration, sleep};
-
-use crate::buffer_batcher::log_buffer_batcher::InMemoryBuffer;
-use crate::helpers::log_processing::process_log_line;
-use crate::parser::parser::NormalizedLog;
-use crate::server::server::LogCollectorService;
-use crate::shipper::shipper::Shipper;
+use tracing::instrument;
 
 /// Tailer struct
 #[derive(Debug)]
@@ -47,34 +49,84 @@ pub struct Tailer {
 
 /// Tailer initialization
 impl Tailer {
+    #[instrument(
+        name = "ves_create_new_log_file_tailer",
+        target = "tailer::tailer::Tailer",
+        skip_all,
+        level = "trace"
+    )]
     pub async fn new_tailer(&mut self) -> Result<()> {
         // Open the file
+        tracing::trace!(
+            log_file_path = %self.file_path.display(),
+            "Opening file to start tailing"
+        );
         let mut file = match File::open(&self.file_path).await {
-            Ok(file) => file,
-            Err(why) => {
+            Ok(file) => {
+                tracing::trace!(
+                    log_file_path = %self.file_path.display(),
+                    "Successfully opened log file"
+                );
+                file
+            }
+            Err(err) => {
+                tracing::error!(
+                    log_file_path = %self.file_path.display(),
+                    error = %err,
+                    "Failed to open log file"
+                );
                 return Err(anyhow::anyhow!(
                     "Couldn't open {}: {}",
                     &self.file_path.display(),
-                    why
+                    err
                 ));
             }
         };
 
         // Seek to the provided offset (to allow resumption from checkpoint)
-        file.seek(SeekFrom::Start(self.file_offset)).await?;
+        tracing::trace!(
+            log_file_path = %self.file_path.display(),
+            offset = %self.file_offset,
+            "Seeking to file offset before tailing"
+        );
+        if let Err(err) = file.seek(SeekFrom::Start(self.file_offset)).await {
+            tracing::error!(
+                log_file_path = %self.file_path.display(),
+                offset = %self.file_offset,
+                error = %err,
+                "Failed to seek file to specified offset"
+            );
+            return Err(err.into());
+        }
+        tracing::trace!(
+            log_file_path = %self.file_path.display(),
+            offset = %self.file_offset,
+            "Successfully seeked file to specified offset"
+        );
 
         // BufReader wrapper to allow efficient line reading
         self.reader = Some(BufReader::new(file));
+        tracing::trace!(
+            log_file_path = %self.file_path.display(),
+            "BufReader initialized for new tailer"
+        );
 
         Ok(())
     }
 
     /// Orchestration loop for spawned Tailer
+    #[instrument(
+        name = "ves_run_log_file_tailer",
+        target = "tailer::tailer::Tailer",
+        skip_all,
+        level = "trace"
+    )]
     pub async fn run_tailer(
         &mut self,
         mut shutdown_rx: tokio::sync::watch::Receiver<bool>,
     ) -> Result<()> {
         // Get access to the file handle (from self or the BufReader returned by new_tailer())
+        tracing::trace!("Fetching handle to log file returned when tailer was spawned");
         let reader = self.reader.as_mut().expect("Tailer not initialized!");
 
         let mut line = String::new();
@@ -85,31 +137,76 @@ impl Tailer {
                 bytes = reader.read_line(&mut line) => {
                     let bytes = bytes?;
                     if bytes == 0 {
+                        tracing::debug!(
+                            log_file_path = %self.file_path.display(),
+                            "No new logs found in tailed log file"
+                        );
                         sleep(Duration::from_millis(100)).await;
                     } else {
+                        tracing::debug!(
+                            log_file_path = %self.file_path.display(),
+                            "New log found in tailed log file acquiring InMemoryBuffer and Shipper locks"
+                        );
                         let mut buffer = self.service.buffer_batcher.lock().await; // Acquire InMemoryBuffer Mutex lock
                         let shipper = self.service.shipper.lock().await; // Acquire Shipper lock
+                        tracing::debug!(
+                            log_file_path = %self.file_path.display(),
+                            log_line = %line,
+                            buffer_lock = ?buffer,
+                            shipper_lock = ?shipper,
+                            "Attempting to process log line"
+                        );
                         match process_log_line(
                             &mut *buffer,
                             &*shipper,
                             line.clone(),
                         )
                         .await {
-                            Ok(status) => println!("Processed log from {:?}: {}", self.file_path, status),
-                            Err(err) => eprintln!("Error processing log from {:?}: {}", self.file_path, err),
+                            Ok(status) => {
+                                tracing::trace!(
+                                    log_file_path = %self.file_path.display(),
+                                    status = %status,
+                                    log_line = %line,
+                                    "Successfully processed log"
+                                );
+                            }
+                            Err(err) => {
+                                tracing::error!(
+                                    log_file_path = %self.file_path.display(),
+                                    error = %err,
+                                    line = %line,
+                                    "Error processing log"
+                                );
+                            }
                         }
                     } // InMemoryBuffer lock released automatically
+                    tracing::trace!(
+                        log_file_path = %self.file_path.display(),
+                        log_line = %line,
+                        "Clearing log line, before processing next log line"
+                    );
                     line.clear();
                 }
                 _ = shutdown_rx.changed() => {
                     if *shutdown_rx.borrow() {
-                        println!("Tailer received shutdown signal for {:?}", self.file_path);
+                        tracing::trace!(
+                            log_file_path = %self.file_path.display(),
+                            "Running Tailer received shutdown signal, acquiring InMemoryBuffer and Shipper locks"
+                        );
 
                         let mut buffer = self.service.buffer_batcher.lock().await;
-                        if let Err(err) = buffer.flush_remaining_logs().await {
-                            eprintln!("Error flushing buffer on shutdown: {}", err);
-                        }
+                        let mut shipper = self.service.shipper.lock().await;
 
+                        // TODO: Shipper logic to handle shutdown successfully....
+                        if let Err(err) = buffer.flush_remaining_logs().await {
+                            tracing::error!(
+                                log_file_path = %self.file_path.display(),
+                                buffer_lock = ?buffer,
+                                shipper_lock = ?shipper,
+                                error = %err,
+                                "Error flushing InMemoryBuffer on shutdown"
+                            );
+                        }
                         break;
                     }
                 }
@@ -117,7 +214,7 @@ impl Tailer {
         }
 
         // Flush offsets/cleanup
-        println!("Tailer stopped for {:?}", self.file_path);
+        tracing::trace!("Running Tailer stopped");
         Ok(())
     }
 }
