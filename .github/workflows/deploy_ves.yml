@@ -1,50 +1,49 @@
-name: Build and Deploy VES to EC2 test environment
+# name: Build and Deploy VES to EC2 test environment
 
-on:
-  push:
-    branches: [main]
+# on:
+#  push:
+#    branches: [main]
 
-jobs:
-  build-and-deploy:
-    runs-on: ubuntu-latest
+# jobs:
+#  build-and-deploy:
+#    runs-on: ubuntu-latest
 
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+#    steps:
+#      - name: Checkout code
+#        uses: actions/checkout@v4
 
-      - name: Install protoc
-        run: sudo apt-get update && sudo apt-get install -y protobuf-compiler
+#      - name: Install protoc
+#        run: sudo apt-get update && sudo apt-get install -y protobuf-compiler
 
-      - name: Install Rust
-        uses: actions-rs/toolchain@v1
-        with:
-          profile: minimal
-          toolchain: stable
-          override: false
+#      - name: Install Rust
+#        uses: actions-rs/toolchain@v1
+#        with:
+#          profile: minimal
+#          toolchain: stable
+#          override: false
 
-      - name: Build release binary
-        run: cargo build --release --locked
+#      - name: Build release binary
+#        run: cargo build --release --locked
+#      - name: Prepare binary for deployment to EC2
+#       run: cp target/release/ves ves.new
 
-      - name: Prepare binary for deployment to EC2
-        run: cp target/release/ves ves.new
+#      - name: Copy binary to EC2
+#       uses: appleboy/scp-action@v1.0.0
+#      with:
+#          host: ${{ secrets.EC2_HOST }}
+#          username: ec2-user
+#          key: ${{ secrets.EC2_SSH_KEY }}
+#          port: 22
+#          source: "ves.new"
+#          target: "/home/ec2-user/ves"
 
-      - name: Copy binary to EC2
-        uses: appleboy/scp-action@v1.0.0
-        with:
-          host: ${{ secrets.EC2_HOST }}
-          username: ec2-user
-          key: ${{ secrets.EC2_SSH_KEY }}
-          port: 22
-          source: "ves.new"
-          target: "/home/ec2-user/ves"
-
-      - name: Update VES binary on EC2
-        uses: appleboy/ssh-action@v1.2.3
-        with:
-          host: ${{ secrets.EC2_HOST }}
-          username: ec2-user
-          key: ${{ secrets.EC2_SSH_KEY }}
-          port: 22
-          script: |
-            sudo chmod +x /home/ec2-user/scripts/deploy_and_restart_ves.sh
-            sudo /home/ec2-user/scripts/deploy_and_restart_ves.sh
+#      - name: Update VES binary on EC2
+#        uses: appleboy/ssh-action@v1.2.3
+#       with:
+#          host: ${{ secrets.EC2_HOST }}
+#          username: ec2-user
+#          key: ${{ secrets.EC2_SSH_KEY }}
+#          port: 22
+#          script: |
+#            sudo chmod +x /home/ec2-user/scripts/deploy_and_restart_ves.sh
+#            sudo /home/ec2-user/scripts/deploy_and_restart_ves.sh
