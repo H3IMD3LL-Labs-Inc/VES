@@ -1,0 +1,9 @@
+# --------------------------------------
+# CLA signatures JSON merge strategy
+# --------------------------------------
+
+# Treat the CLA signature file as a single atomic files to avoid merge conflicts
+signatures/version1/cla.json merge=union
+
+# Ensure JSON files are normalized as text
+*.json text
