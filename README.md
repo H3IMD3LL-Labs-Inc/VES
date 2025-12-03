@@ -15,11 +15,11 @@
     <!-- Commit activity -->
     <a href="https://github.com/H3IMD3LL-Labs-Inc/VES/commits/main"><img alt="GitHub commit activity" src="https://img.shields.io/github/commit-activity/w/H3IMD3LL-Labs-Inc/VES?style=flat"/></a>
     <!-- Issues -->
-    <a href="https://github.com/H3IMD3LL-Labs-Inc/VES/issues"><img alt="GitHub issues" src="https://img.shields.io/github/issues-open/H3IMD3LL-Labs-Inc/VES?style=flat"/></a>
+    <a href="https://github.com/H3IMD3LL-Labs-Inc/VES/issues"><img alt="GitHub issues" src="https://img.shields.io/github/issues/H3IMD3LL-Labs-Inc/VES?style=flat&cacheSeconds=60"/></a>
     <!-- Stars -->
-    <a href="https://github.com/H3IMD3LL-Labs-Inc/VES/stargazers"><img alt="GitHub stars" src="https://img.shields.io/github/stars/H3IMD3LL-Labs-Inc/VES?style=flat"/></a>
+    <a href="https://github.com/H3IMD3LL-Labs-Inc/VES/stargazers"><img alt="GitHub stars" src="https://img.shields.io/github/stars/H3IMD3LL-Labs-Inc/VES?style=flat&cacheSeconds=60"/></a>
     <!-- Forks -->
-    <a href="https://github.com/H3IMD3LL-Labs-Inc/VES/forks"><img alt="GitHub forks" src="https://img.shields.io/github/forks/H3IMD3LL-Labs-Inc/VES?style=flat"/></a>
+    <a href="https://github.com/H3IMD3LL-Labs-Inc/VES/forks"><img alt="GitHub forks" src="https://img.shields.io/github/forks/H3IMD3LL-Labs-Inc/VES?style=flat&cacheSeconds=60"/></a>
     <!-- Docker stats (pulls & stars) (use correct repo name when ready) -->
     <!--
     <a href="https://hub.docker.com/r/heimdelllabs/ves">
@@ -47,18 +47,19 @@ You no longer need to read hundreds of docs from different tools just to add obs
 
 ## Table of Contents
 
-- [VES is a high performance, highly configurable and easy-to-understand observability data agent-aggregator](#ves-is-a-high-performance-high-performance-highly-configurable-and-easy-to-understand-observability-data-agent-aggregator)
+- [VES is a high performance, highly configurable and easy-to-understand observability data agent-aggregator](#ves-is-a-high-performance-highly-configurable-and-easy-to-understand-observability-data-agent-aggregator)
 - [Guiding principles](#guiding-principles)
 - [Use cases](#use-cases)
 - [Comparisons](#comparisons)
-- [Getting started with VES](#getting-started-with-posthog)
+- [Getting started with VES](#getting-started-with-ves)
   - [Self-hosting the open-source Beta](#self-hosting-the-open-source-beta)
-  - [VES Cloud(Coming Soon)](#ves-cloud)
-- [Setting up a VES instance](#setting-up-ves-a-instance)
+  - [VES Cloud (Coming Soon)](#ves-cloud-coming-soon)
+- [Setting up VES](#setting-up-ves)
 - [Learning more about VES](#learning-more-about-ves)
 - [Roadmap](#roadmap)
 - [Contributing](#contributing)
 - [License](#license)
+
 
 ## Getting started with VES
 
@@ -68,7 +69,7 @@ Currently, the only way to use the latest development version of VES is self-hos
 
 See [Building VES](building.md)
 
-### VES Cloud(Coming Soon)
+### VES Cloud (Coming Soon)
 
 The fastest and easiest way to get started with VES will be signing up for free to VES Cloud.
 
