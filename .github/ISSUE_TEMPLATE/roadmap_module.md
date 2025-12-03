@@ -1,33 +1,31 @@
 ---
-name: 📍 Roadmap Module
-about: Track progress on a module from the project Roadmap
-title: "[Module]"
+name: 🚀 Release
+about: Track progress for a VES release version; parent issue for related feature, documentation, chore and bug issues
+title: "[Release Roadmap] vX.Y.Z"
 assignees: ""
 ---
 
-## 📍 Module
-Which roadmap item does this issue cover?
-- [ ] v0.0.1 - MVP
-- [ ] v0.1.0 - Improvements
-- [ ] v1.0.0 - Production-ready release
+## 📍 Roadmap
+Which VES release does this issue track?
+<!-- Update to current release when creating the issue -->
+- Release Version: `v1.0.0-beta`
 
 ## 🧩 Description
-Describe the feature/module in detail:
-- What should it do?
-- Why is it needed?
+Describe the purpose of this release and what it should achieve:
+- What major features, improvements, or fixes does it belong to?
+- Why is this release important?
 
-## ✅ Tasks
-Break down into smaller subtasks, if possible:
-- [ ] Define API Schema
-- [ ] Implement core logic
-- [ ] Add unit tests
-- [ ] Update documentation
+## ✅ Related Work
+Link to issues (feature, bugs, docs, chores) related to this release:
+- Feature requests: #issue-number
+- Bug reports: #issue-number
+- Documentation: #issue-number
+- Chores/Infra: #issue-number
 
 ## 📊 Progress
 <!-- Update as you go --->
 - Status: `Not started / In Progress / Blocked / Done`
-- Related PRs: #<pr-number>
+- Related PRs: #pr-number
 
 ## 🔗 References
-- Link to Roadmap: [README.md#roadmap](../README.md#roadmap)
-- Any related issues/discussions:
+- Link to current Roadmap: [README.md#roadmap](../README.md#roadmap)

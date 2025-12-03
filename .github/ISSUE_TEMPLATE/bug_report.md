@@ -1,31 +1,33 @@
 ---
 name: 🐞 Bug Report
-about: Report a bug or unexpected behavior
+about: Report a bug or unexpected behavior identified in the current stable version
 title: "[Bug]: "
 labels: ["bug"]
 assignees: ""
 ---
 
 ## 🐛 Description
-A clear and concise description of the bug.
+Provide a clear and detailed explanation of the bug or unexpected behavior
 
 ## ✅ Steps to Reproduce
-1. Go to '...'
-2. Run command '...'
-3. See error
+Provide clear step-by-step instructions to recreate the bug or unexpected behavior, for example
+```bash
+Go to '...'
+Run <command(s)> or Do <action(s)>
+See error or unexpected behavior
+```
 
-## 🤔 Expected behavior
-What should have happened?
+## Expected behavior
+Explain what behavior should have occured instead of the unexpected behavior or bug
 
 ## 🖼️ Screenshots / Logs
-If applicable, add screenshots or log snippets.
+If possible, provide screenshots or logs to explain and/or reproduce the bug or unexpected behavior
 
-## 🖥️ Environment
+## 🖥️ Environment where bug or unexpected behavior occured
 - OS: [e.g. Ubuntu 22.04]
-- Kubernetes version: [e.g. 1.27]
-- ChromaDB version: [e.g. 1.0.21.dev65]
 - Rust version: [e.g. 1.89.0]
-- VES version/commit: [e.g. v0.0.1]
+- VES version or commit(if using `dev` version): [e.g. v0.1.0-beta]
 
 ## 🔗 References
-Related issues/PRs:
+- Related issues/PRs: #issue-number, #pr-number
+- Link to roadmap release issue: #roadmap-issue-number

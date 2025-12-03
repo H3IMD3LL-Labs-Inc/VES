@@ -6,13 +6,16 @@ labels: ["chore"]
 assignees: ""
 ---
 
-## ⚙️ Task
-What needs to be done?
+## 📍 Current Roadmap
+The current roadmap related to this feature?
+- Roadmap: `v1.0.0-beta` (#roadmap-issue-number)
 
-## ✅ Checklist
-- [ ] Implementation
-- [ ] Testing
-- [ ] Documentation (if applicable)
+## ⚙️ Task
+What is the exact task or chore to be done:
+- Be as clear and understandable as possible
+- How does this improve the quality and/or experience of future release?
+- Does it affect the current upcoming release?
 
 ## 🔗 References
-Related issues/PRs:
+- Related issues/PRs: #issue-number, #pr-number
+- Link to roadmap release issue: #roadmap-issue-number
