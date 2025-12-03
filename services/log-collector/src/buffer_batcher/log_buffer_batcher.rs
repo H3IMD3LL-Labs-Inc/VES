@@ -1,5 +1,10 @@
-use crate::helpers::load_config::{BufferConfig, DurabilityConfig};
-use crate::parser::parser::NormalizedLog;
+// Local crate
+use crate::{
+    helpers::load_config::{BufferConfig, DurabilityConfig},
+    parser::parser::NormalizedLog,
+};
+
+// External crates
 use r2d2::{Pool, PooledConnection};
 use r2d2_sqlite::SqliteConnectionManager;
 use rusqlite::{Connection, Result, params};
@@ -8,6 +13,7 @@ use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::Notify;
 use tokio::time::Instant;
+use tracing::instrument;
 
 /// In-Memory Buffer (runtime structure)
 #[derive(Debug, Clone)]
@@ -32,40 +38,72 @@ pub enum Durability {
 }
 
 impl InMemoryBuffer {
-    pub async fn new(buffer_config: BufferConfig) -> Self {
+    #[instrument(
+        name = "ves_inmemory_buffer_create",
+        target = "buffer_batcher::log_buffer_batcher::InMemoryBuffer",
+        skip_all,
+        level = "trace"
+    )]
+    pub async fn new(buffer_config: BufferConfig) -> Result<Self, String> {
+        tracing::debug!(
+            in_memory_buffer_configuration = ?buffer_config,
+            "Creating new InMemoryBuffer using buffer configurations"
+        );
+
         let queue = match buffer_config.capacity_option.as_str() {
             "bounded" => {
-                println!(
-                    "Creating bounded buffer with capacity {}",
-                    buffer_config.buffer_capacity
+                tracing::info!(
+                    bounded_inmemory_buffer_capacity = ?buffer_config.buffer_capacity,
+                    "Creating bounded InMemoryBuffer with set capacity"
                 );
                 VecDeque::with_capacity(buffer_config.buffer_capacity as usize)
             }
             "unbounded" => {
-                println!("Creating unbounded buffer");
+                tracing::warn!("Creating unbounded InMemoryBuffer without set capacity");
                 VecDeque::new()
             }
             other => {
-                panic!("{} is not a valid buffer capacity_option", other);
+                tracing::error!(
+                    inmemory_buffer_capacity = ?other,
+                    "Invalid InMemoryBuffer buffer capacity option configured"
+                );
+                return Err(format!(
+                    "{} is not a valid InMemoryBuffer capacity_option",
+                    other
+                ));
             }
         };
 
         let durability = match &buffer_config.durability {
             DurabilityConfig::InMemory => {
-                println!(
-                    "Using in-memory buffer (no persistence support). \
-                    We do not recommend running in this configuration in production deployments."
+                tracing::warn!(
+                    "InMemoryBuffer durability set to Durability::InMemory, no persistence support. \
+                    We do not recomment running in this configuration in production deployments"
                 );
                 Durability::InMemory
             }
             DurabilityConfig::SQLite(path) => {
-                println!("Creating persistent buffer with SQLite support at {}", path);
+                tracing::info!(
+                    sqlite_db_path = ?path,
+                    "InMemoryBuffer durability set to Durability::SQLite, persistence support is active"
+                );
 
                 let manager = SqliteConnectionManager::file(path);
-                let pool = Pool::new(manager)
-                    .unwrap_or_else(|e| panic!("Failed to create SQLite pool: {}", e));
+                let pool = Pool::new(manager).map_err(|e| {
+                    tracing::error!(
+                        error = %e,
+                        "Failed to create SQLite connection pool"
+                    );
+                    format!("Failed to create SQLite connection pool: {}", e)
+                })?;
 
-                let conn = pool.get().expect("Failed to get pooled SQLite connection");
+                let conn = pool.get().map_err(|e| {
+                    tracing::error!(
+                        error = %e,
+                        "Failed to get pooled SQLite connection"
+                    );
+                    format!("Failed to get pooled SQLite connection: {}", e)
+                })?;
                 conn.execute(
                     "CREATE TABLE IF NOT EXISTS normalized_logs (
                         id              INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -77,13 +115,23 @@ impl InMemoryBuffer {
                     )",
                     (),
                 )
-                .expect("Failed to create normalized_logs table in SQLite");
+                .map_err(|e| {
+                    tracing::error!(
+                        error = %e,
+                        sqlite_db_path = %path,
+                        "Failed to create normalized_logs table in SQLite database"
+                    );
+                    format!(
+                        "Failed to create normalized_logs table in SQLite database: {}",
+                        e
+                    )
+                })?;
 
                 Durability::SQLite(Arc::new(pool))
             }
         };
 
-        InMemoryBuffer {
+        Ok(Self {
             queue,
             buffer_capacity: buffer_config.buffer_capacity,
             batch_size: buffer_config.batch_size,
@@ -94,7 +142,7 @@ impl InMemoryBuffer {
             drain_policy: buffer_config.drain_policy.clone(),
             flush_policy: buffer_config.flush_policy.clone(),
             notify: Arc::new(Notify::new()),
-        }
+        })
     }
 
     /// Gracefully shuts down the InMemoryBuffer.
@@ -104,8 +152,14 @@ impl InMemoryBuffer {
     /// - Any blocked tasks waiting on `notify` are released.
     /// - The underlying durability layer (SQLite or InMemory) is gracefully closed.
     /// - No further writes should be attempted after shutdown.
+    #[instrument(
+        name = "ves_inmemory_buffer_shutdown_signal",
+        target = "buffer_batcher::log_buffer_batcher::InMemoryBuffer",
+        skip_all,
+        level = "trace"
+    )]
     pub async fn shutdown(&mut self) -> Result<()> {
-        println!("InMemoryBuffer shutdown initiated...");
+        tracing::warn!("Shutdown signal received, InMemoryBuffer shutdown initiated");
 
         // Wake all waiting tasks, ensuring no task remains blocked waiting
         // for capacity during shutdown
@@ -113,34 +167,42 @@ impl InMemoryBuffer {
 
         // Flush all remaining logs
         if !self.queue.is_empty() {
-            println!(
-                "Flushing {} remaining logs before shutdown...",
-                self.queue.len()
+            tracing::info!(
+                logs_in_inmemory_buffer = %self.queue.len(),
+                "Flushing remaining logs in InMemoryBuffer befor shutdown"
             );
 
             if let Err(err) = self.flush_remaining_logs().await {
-                eprintln!("Error flushing remaining logs: {}", err);
+                tracing::error!(
+                    error = %err,
+                    "Error flushing remaining logs from InMemoryBuffer"
+                );
             } else {
-                println!("Remaining logs successfully flushed.");
+                tracing::info!(
+                    logs_in_inmemory_buffer = %self.queue.len(),
+                    "Successfully flushed remaining logs from InMemoryBuffer"
+                );
             }
         } else {
-            println!("No remaining logs to flush.");
+            tracing::info!("No remaining logs to flush from InMemoryBuffer");
         }
 
         // Release durability layer resources
         match &mut self.durability {
             Durability::SQLite(pool) => {
-                println!("Releasing SQLite connection pool...");
+                tracing::info!("Releasing SQLite connection pool");
                 // Dropping Arc<Pool> reference allows connections to close naturally.
                 // No explicit close method exists for r2d2 pools.
                 let _ = Arc::get_mut(pool);
             }
             Durability::InMemory => {
-                println!("Using in-memory durability, no persistence connection to close.");
+                tracing::info!(
+                    "Currently using in-memory durability, no persistent SQLite connection pool to close"
+                );
             }
         }
 
-        println!("InMemoryBuffer Shutdown completed successfully.");
+        tracing::info!("InMemoryBuffer successfully shutdown gracefully");
 
         Ok(())
     }
@@ -160,9 +222,22 @@ impl InMemoryBuffer {
     /// Asynchronously push a `NormlizedLog` to an `InMemoryBuffer`.
     ///
     /// Logs in the buffer are persisted to SQLite after each `push_back`
-    /// to the buffer.
+    /// to the buffer. If persistence configuration is set to `SQLite`
+    #[instrument(
+        name = "ves_inmemory_buffer_push",
+        target = "buffer_batcher::log_buffer_batcher::InMemoryBuffer",
+        skip_all,
+        level = "trace"
+    )]
     pub async fn push(&mut self, log: NormalizedLog) -> Result<()> {
+        // TODO: increment_counter!("normalizedlogs.buffered");
+
         if self.buffer_capacity > 0 && self.queue.len() >= self.buffer_capacity as usize {
+            tracing::warn!(
+                inmemory_buffer_capacity = %self.buffer_capacity,
+                inmemory_buffer_queue_len = %self.queue.len(),
+                "InMemoryBuffer overflowing, dropping logs or handling overflow"
+            );
             self.handle_overflow();
         }
 
@@ -180,7 +255,19 @@ impl InMemoryBuffer {
             Durability::SQLite(_pool) => {
                 self.queue.push_back(log.clone());
 
-                self.flush(log.clone()).await?;
+                // TODO: increment_counter!("normalizedlogs.persisted_attempt");
+
+                if let Err(e) = self.flush(log.clone()).await {
+                    // TODO: increment_counter!("normalizedlogs.persisted_fail");
+
+                    tracing::error!(
+                        error = %e,
+                        "Failed to persist NormalizedLog to SQLite db"
+                    );
+                    return Err(e);
+                }
+
+                // TODO: increment_counter!("normalizedlogs.persisted_success");
             }
         }
 
@@ -192,6 +279,12 @@ impl InMemoryBuffer {
     /// duplication.
     ///
     /// Returns flushed `NormalizedLog` batch after flush is triggered.
+    #[instrument(
+        name = "ves_inmemory_buffer_flush",
+        target = "buffer_batcher::log_buffer_batcher::InMemoryBuffer",
+        skip_all,
+        level = "trace"
+    )]
     pub async fn flush(&mut self, log: NormalizedLog) -> Result<Option<InMemoryBuffer>> {
         // Variables to store user configured flush triggers
         let flush_by_batch_size = self.queue.len() >= self.batch_size;
@@ -204,28 +297,50 @@ impl InMemoryBuffer {
             "batch_timeout" => flush_by_batch_timeout_ms,
             "hybrid_size_timeout" => flush_by_batch_size || flush_by_batch_timeout_ms,
             other => {
-                eprintln!(
-                    "No correct flush_policy configured. '{}' is not a flush_policy option",
-                    other
+                tracing::error!(
+                    invalid_flush_policy = ?other,
+                    "Invalid flush_policy configured, skipping InMemoryBuffer flush"
                 );
                 false
             }
         };
 
         if !should_flush {
+            tracing::warn!(
+                flush_policy = %self.flush_policy,
+                queue_len = %self.queue.len(),
+                "InMemoryBuffer flush not triggered: NormalizedLogs remain in InMemoryBuffer"
+            );
             return Ok(None); // Nothing to flush
         }
 
         // Determine how many logs to flush
         let flush_count =
             if self.flush_policy == "batch_size" || self.flush_policy == "hybrid_size_timeout" {
+                tracing::info!(
+                    policy = %self.flush_policy,
+                    batch_size = %self.batch_size,
+                    queue_len = %self.queue.len(),
+                    flush_count = %self.batch_size.min(self.queue.len()),
+                    "Flushing InMemoryBuffer NormalizedLogs based on batch_size policy"
+                );
                 self.batch_size.min(self.queue.len())
             } else {
+                tracing::info!(
+                    policy = %self.flush_policy,
+                    queue_len = %self.queue.len(),
+                    flush_count = %self.queue.len(),
+                    "Flushing all NormalizedLogs in InMemoryBuffer"
+                );
                 self.queue.len()
             };
 
         // Collect the logs being flushed in an InMemoryBuffer
         let drained_logs: Vec<NormalizedLog> = self.queue.drain(..flush_count).collect();
+        tracing::debug!(
+            drained_logs_count = %drained_logs.len(),
+            "Drained NormalizedLogs from InMemoryBuffer for flush"
+        );
 
         // Wrap collected logs from log_batch in an InMemoryBuffer
         let buffer = InMemoryBuffer {
@@ -244,6 +359,11 @@ impl InMemoryBuffer {
         // Perform actual flush based on configured durability
         match &mut self.durability {
             Durability::SQLite(pool) => {
+                tracing::debug!(
+                    inmemory_buffer_flush_count = %buffer.queue.len(),
+                    "Persisting NormalizedLogs to SQLite db"
+                );
+
                 let mut conn = pool
                     .get()
                     .expect("Failed to get DB connection from connection pool");
@@ -264,31 +384,57 @@ impl InMemoryBuffer {
                 }
                 tx.commit()?; // commit transaction once
                 self.last_flush_at = Instant::now();
+
+                tracing::info!(
+                    persisted_count = %buffer.queue.len(),
+                    "Successfully persisted NormalizedLogs to SQLite"
+                );
+
                 Ok(Some(buffer))
             }
             Durability::InMemory => {
                 self.last_flush_at = Instant::now();
-                eprintln!(
-                    "Durability set to `InMemory`: returning flushed logs without persistence to SQLite."
+                tracing::info!(
+                    inmemory_buffer_flush_count = %buffer.queue.len(),
+                    "Durability is Durability::InMemory: NormalizedLogs flushed from InMemoryBuffer but not persisted to SQLite"
                 );
                 Ok(Some(buffer))
             }
         }
     }
 
+    #[instrument(
+        name = "ves_inmemory_buffer_flush_remaining_logs",
+        target = "buffer_batcher::log_buffer_batcher::InMemoryBuffer",
+        skip_all,
+        level = "trace"
+    )]
     pub async fn flush_remaining_logs(&mut self) -> Result<()> {
         if self.queue.is_empty() {
+            tracing::debug!(
+                remaining_logs = 0,
+                "No remaining NormalizedLogs in InMemoryBuffer to flush"
+            );
             return Ok(());
         }
 
-        println!(
-            "Flushing remaining {} logs from InMemoryBuffer",
-            self.queue.len()
+        tracing::info!(
+            remaining_logs = %self.queue.len(),
+            "Flushing remaining NormalizedLogs from InMemoryBuffer"
         );
         let drained_logs: Vec<NormalizedLog> = self.queue.drain(..).collect();
+        tracing::debug!(
+            drained_logs_count = %drained_logs.len(),
+            "Drained NormalizedLogs from InMemoryBuffer for final flush"
+        );
 
         match &mut self.durability {
             Durability::SQLite(pool) => {
+                tracing::debug!(
+                    inmemory_buffer_flush_count = %drained_logs.len(),
+                    "Persisting remaining logs for SQLite"
+                );
+
                 let mut conn = pool
                     .get()
                     .expect("Failed to get DB connection from connection pool");
@@ -308,9 +454,17 @@ impl InMemoryBuffer {
                     )?;
                 }
                 tx.commit()?;
+
+                tracing::info!(
+                    persisted_count = %drained_logs.len(),
+                    "Successfully persisted remaining NormalizedLogs to SQLite"
+                );
             }
             Durability::InMemory => {
-                eprintln!("Durability set to InMemory, logs not persisted.");
+                tracing::info!(
+                    inmemory_buffer_flush_count = %drained_logs.len(),
+                    "Durability is Durability::InMemory: remaining NormalizedLogs drained from InMemoryBuffer but not persisted to SQLite"
+                );
             }
         }
 
@@ -328,30 +482,64 @@ impl InMemoryBuffer {
     ///
     /// **Use Cases**:
     /// - `NormalizedLog` batch has been flushed to SQLite persistence **flush()**.
+    #[instrument(
+        name = "ves_inmemory_buffer_drain",
+        target = "buffer_batcher::log_buffer_batcher::InMemoryBuffer",
+        skip_all,
+        level = "trace"
+    )]
     pub async fn drain(&mut self) -> Result<()> {
         match self.drain_policy.as_str() {
             "drain_all" => {
-                self.queue.drain(..self.queue.len());
+                let drained_count = self.queue.len();
+                self.queue.drain(..drained_count);
+                tracing::info!(
+                    policy = %self.drain_policy,
+                    drained_count = %drained_count,
+                    "Drained all NormalizedLogs from InMemoryBuffer"
+                );
                 Ok(())
             }
+
             "drain_batch_size" => {
-                if self.queue.len() >= self.batch_size {
-                    self.queue.drain(..self.batch_size);
-                }
+                let drained_count = if self.queue.len() >= self.batch_size {
+                    self.queue.drain(..self.batch_size).count()
+                } else {
+                    0
+                };
+                tracing::info!(
+                    policy = %self.drain_policy,
+                    batch_size = %self.batch_size,
+                    drained_count = %drained_count,
+                    "Drained NormalizedLogs based on batch_size from InMemoryBuffer"
+                );
                 Ok(())
             }
+
             "drain_batch_timeout" => {
-                if Instant::now().duration_since(self.last_flush_at)
-                    > Duration::from_millis(self.batch_timeout_ms)
-                {
-                    self.queue.drain(..self.queue.len());
-                }
+                let elapsed_ms = Instant::now()
+                    .duration_since(self.last_flush_at)
+                    .as_millis();
+                let drained_count = if elapsed_ms > self.batch_timeout_ms as u128 {
+                    let count = self.queue.len();
+                    self.queue.drain(..count);
+                    count
+                } else {
+                    0
+                };
+                tracing::info!(
+                    policy = %self.drain_policy,
+                    elapsed_ms = %elapsed_ms,
+                    drained_count = %drained_count,
+                    "Drained NormalizedLogs based on batch_timeout from InMemoryBuffer"
+                );
                 Ok(())
             }
+
             other => {
-                eprintln!(
-                    "No correct drain_policy configured. {} is not a drain_policy option",
-                    other
+                tracing::error!(
+                    invalid_drain_policy = ?other,
+                    "Invalid drain_policy configured. NormalizedLogs not drained from InMemoryBuffer"
                 );
                 Ok(())
             }
@@ -364,33 +552,62 @@ impl InMemoryBuffer {
     /// This ensures buffer_capacity is not exceeded while pushing `NormalizedLog`
     /// to `InMemoryBuffer`. An `InMemoryBuffer` overflowing is handled prior to pushing
     /// `NormalizedLog` to it.
+    #[instrument(
+        name = "ves_inmemory_buffer_overflow",
+        target = "buffer_batcher::log_buffer_batcher::InMemoryBuffer",
+        skip_all,
+        level = "trace"
+    )]
     async fn handle_overflow(&mut self) -> Result<bool> {
         match self.overflow_policy.as_str() {
             "drop_newest" => {
-                eprintln!("Buffer full: dropping newest incoming log");
+                tracing::warn!(
+                    policy = %self.overflow_policy,
+                    buffer_capacity = %self.buffer_capacity,
+                    queue_len = %self.queue.len(),
+                    "InMemoryBuffer full: dropping newest incoming NormalizedLog"
+                );
                 Ok(false)
             }
             "drop_oldest" => {
-                self.queue.pop_front();
+                let dropped = self.queue.pop_front();
+                tracing::warn!(
+                    policy = %self.overflow_policy,
+                    dropped_log_present = %dropped.is_some(),
+                    queue_len_after = %self.queue.len(),
+                    "InMemoryBuffer full: dropping oldest NormalizedLog"
+                );
                 Ok(true)
             }
             "block_with_backpressure" => {
+                tracing::warn!(
+                    policy = %self.overflow_policy,
+                    buffer_capacity = %self.buffer_capacity,
+                    queue_len = %self.queue.len(),
+                    "InMemoryBuffer full: applying backpressure, waiting until queue has space"
+                );
                 while self.queue.len() >= self.buffer_capacity as usize {
                     self.notify.notified().await;
                 }
+                tracing::info!(
+                    queue_len_after = %self.queue.len(),
+                    "InMemoryBuffer backpressure released, space available in queue"
+                );
                 Ok(false)
             }
             "grow_capacity" => {
                 self.queue.reserve(1);
-                eprintln!(
-                    "buffer_capacity exceeded, capacity extended without memory re-allocation"
+                tracing::warn!(
+                    policy = %self.overflow_policy,
+                    new_capacity = %self.queue.capacity(),
+                    "InMemoryBuffer full: deque capacity exceeded, capacity extended dynamically"
                 );
                 Ok(true)
             }
             other => {
-                eprintln!(
-                    "No overflow_policy configured, {} is not a configuration option",
-                    other
+                tracing::error!(
+                    invalid_overflow_policy = ?other,
+                    "Invalid overflow_policy configured, InMemoryBuffer overflow is unhandled!"
                 );
                 Ok(false)
             }
