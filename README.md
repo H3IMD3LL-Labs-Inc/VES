@@ -3,41 +3,23 @@
 </p>
 <p align="center">
     <!-- Codecov -->
-    <a href="https://codecov.io/gh/H3IMD3LL-Labs-Inc/VES">
-        <img alt="Code Coverage" src="https://codecov.io/gh/H3IMD3LL-Labs-Inc/VES/branch/main/graph/badge.svg?token=YLBMDY8WC0"/>
-    </a>
+    <a href="https://codecov.io/gh/H3IMD3LL-Labs-Inc/VES"><img alt="Code Coverage" src="https://codecov.io/gh/H3IMD3LL-Labs-Inc/VES/branch/main/graph/badge.svg?token=YLBMDY8WC0"/></a>
     <!-- LOC -->
-    <a href="https://github.com/H3IMD3LL-Labs-Inc/VES">
-        <img alt="LOC" src="https://img.shields.io/endpoint?url=https://ghloc.vercel.app/api/H3IMD3LL-Labs-Inc/VES/badge?filter=.rs$,.sh$,.toml$&amp;style=flat&amp;logoColor=white&amp;label=Lines%20of%20Code" />
-    </a>
+    <a href="https://github.com/H3IMD3LL-Labs-Inc/VES"><img alt="LOC" src="https://img.shields.io/endpoint?url=https://ghloc.vercel.app/api/H3IMD3LL-Labs-Inc/VES/badge?filter=.rs$,.sh$,.toml$&amp;style=flat&amp;logoColor=white&amp;label=Lines%20of%20Code" /></a>
     <!-- Contributors -->
-    <a href="https://github.com/H3IMD3LL-Labs-Inc/VES/graphs/contributors">
-        <img alt="GitHub contributors" src="https://img.shields.io/github/contributors/H3IMD3LL-Labs-Inc/VES?style=flat"/>
-    </a>
+    <a href="https://github.com/H3IMD3LL-Labs-Inc/VES/graphs/contributors"><img alt="GitHub contributors" src="https://img.shields.io/github/contributors/H3IMD3LL-Labs-Inc/VES?style=flat"/></a>
     <!-- PRs welcome -->
-    <a href="https://makepullrequest.com">
-        <img alt="PRs Welcome" src="https://img.shields.io/badge/PRs-welcome-brightgreen.svg?style=flat"/>
-    </a>
+    <a href="https://makepullrequest.com"><img alt="PRs Welcome" src="https://img.shields.io/badge/PRs-welcome-brightgreen.svg?style=flat"/></a>
     <!-- Releases -->
-    <a href="https://github.com/H3IMD3LL-Labs-Inc/VES/releases">
-        <img alt="GitHub releases" src="https://img.shields.io/github/v/release/H3IMD3LL-Labs-Inc/VES?style=flat"/>
-    </a>
+    <a href="https://github.com/H3IMD3LL-Labs-Inc/VES/releases"><img alt="GitHub releases" src="https://img.shields.io/github/v/release/H3IMD3LL-Labs-Inc/VES?style=flat"/></a>
     <!-- Commit activity -->
-    <a href="https://github.com/H3IMD3LL-Labs-Inc/VES/commits/main">
-        <img alt="GitHub commit activity" src="https://img.shields.io/github/commit-activity/w/H3IMD3LL-Labs-Inc/VES?style=flat"/>
-    </a>
+    <a href="https://github.com/H3IMD3LL-Labs-Inc/VES/commits/main"><img alt="GitHub commit activity" src="https://img.shields.io/github/commit-activity/w/H3IMD3LL-Labs-Inc/VES?style=flat"/></a>
     <!-- Issues -->
-    <a href="https://github.com/H3IMD3LL-Labs-Inc/VES/issues">
-        <img alt="GitHub issues" src="https://img.shields.io/github/issues-open/H3IMD3LL-Labs-Inc/VES?style=flat"/>
-    </a>
+    <a href="https://github.com/H3IMD3LL-Labs-Inc/VES/issues"><img alt="GitHub issues" src="https://img.shields.io/github/issues-open/H3IMD3LL-Labs-Inc/VES?style=flat"/></a>
     <!-- Stars -->
-    <a href="https://github.com/H3IMD3LL-Labs-Inc/VES/stargazers">
-        <img alt="GitHub stars" src="https://img.shields.io/github/stars/H3IMD3LL-Labs-Inc/VES?style=flat"/>
-    </a>
+    <a href="https://github.com/H3IMD3LL-Labs-Inc/VES/stargazers"><img alt="GitHub stars" src="https://img.shields.io/github/stars/H3IMD3LL-Labs-Inc/VES?style=flat"/></a>
     <!-- Forks -->
-    <a href="https://github.com/H3IMD3LL-Labs-Inc/VES/forks">
-        <img alt="GitHub forks" src="https://img.shields.io/github/forks/H3IMD3LL-Labs-Inc/VES?style=flat"/>
-    </a>
+    <a href="https://github.com/H3IMD3LL-Labs-Inc/VES/forks"><img alt="GitHub forks" src="https://img.shields.io/github/forks/H3IMD3LL-Labs-Inc/VES?style=flat"/></a>
     <!-- Docker stats (pulls & stars) (use correct repo name when ready) -->
     <!--
     <a href="https://hub.docker.com/r/heimdelllabs/ves">
