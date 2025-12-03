@@ -14,8 +14,10 @@
     <a href="https://github.com/H3IMD3LL-Labs-Inc/VES/releases"><img alt="GitHub releases" src="https://img.shields.io/github/v/release/H3IMD3LL-Labs-Inc/VES?style=flat"/></a>
     <!-- Commit activity -->
     <a href="https://github.com/H3IMD3LL-Labs-Inc/VES/commits/main"><img alt="GitHub commit activity" src="https://img.shields.io/github/commit-activity/w/H3IMD3LL-Labs-Inc/VES?style=flat"/></a>
-    <!-- Issues -->
-    <a href="https://github.com/H3IMD3LL-Labs-Inc/VES/issues"><img alt="GitHub issues" src="https://img.shields.io/github/issues/H3IMD3LL-Labs-Inc/VES?style=flat&cacheSeconds=60"/></a>
+    <!-- Issues open -->
+    <a href="https://github.com/H3IMD3LL-Labs-Inc/VES/issues"><img alt="GitHub open issues" src="https://img.shields.io/github/issues/H3IMD3LL-Labs-Inc/VES?style=flat&cacheSeconds=60"/></a>
+    <!-- Issues closed -->
+    <a href="https://github.com/H3IMD3LL-Labs-Inc/VES/issues"><img alt="GitHub closed issues" src="https://img.shields.io/github/issues-closed/H3IMD3LL-Labs-Inc/VES?style=flat&cacheSeconds=60"></a>
     <!-- Stars -->
     <a href="https://github.com/H3IMD3LL-Labs-Inc/VES/stargazers"><img alt="GitHub stars" src="https://img.shields.io/github/stars/H3IMD3LL-Labs-Inc/VES?style=flat&cacheSeconds=60"/></a>
     <!-- Forks -->
