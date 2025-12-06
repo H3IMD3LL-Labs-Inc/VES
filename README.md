@@ -34,7 +34,7 @@
 </p>
 
 <p align="center">
-    <a href="https://ves.heimdelllabs.com/docs">Docs</a> - <a href="https://discord.gg/">Discord</a> - <a href="https://x.com/heimdell_labs">X/Twitter</a> - <a href="https://ves.heimdelllabs.cloud/roadmap">Roadmap</a> - <a href="https://ves.heimdelllabs.cloud/why">Why VES?<a/> - <a href="https://ves.heimdelllabs.cloud/changelog">Changelog</a>
+    <a href="https://ves.heimdelllabs.com"><strong>Docs</strong></a> - <a href="https://discord.gg/"><strong>Discord</strong></a> - <a href="https://x.com/heimdell_labs"><strong>X/Twitter</strong></a> - <a href="https://ves.heimdelllabs.cloud/documentation/coming-soon/overview"><strong>Roadmap</strong></a> - <a href="https://ves.heimdelllabs.cloud/documentation/ves-v0.1.0/ves"><strong>Why VES?</strong><a/> - <a href="https://ves.heimdelllabs.cloud/documentation/coming-soon/overview"><strong>Changelog</strong></a>
 </p>
 
 <p align="center">
