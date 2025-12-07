@@ -1,16 +1,17 @@
-use crate::buffer_batcher::log_buffer_batcher::InMemoryBuffer;
-use crate::helpers::log_processing::process_log_line;
-use crate::parser::parser::NormalizedLog;
-use crate::proto::collector::CollectResponse;
-use crate::proto::common::RawLog;
-use crate::shipper::shipper::Shipper;
+// Local crates
+use crate::{
+    buffer_batcher::log_buffer_batcher::InMemoryBuffer, helpers::log_processing::process_log_line,
+    parser::parser::NormalizedLog, proto::collector::CollectResponse, proto::common::RawLog,
+    shipper::shipper::Shipper,
+};
+
+// External crates
 use futures::StreamExt;
-use std::pin::Pin;
-use std::sync::Arc;
-use tokio::sync::Mutex;
-use tokio::sync::mpsc;
+use std::{pin::Pin, sync::Arc};
+use tokio::sync::{Mutex, mpsc};
 use tokio_stream::wrappers::ReceiverStream;
 use tonic::{Request, Response, Status};
+use tracing::instrument;
 
 #[derive(Debug, Clone)]
 pub struct LogCollectorService {
@@ -27,7 +28,7 @@ pub struct LogCollectorService {
 // actual logic(modules).
 #[tonic::async_trait]
 impl crate::proto::collector::log_collector_server::LogCollector for LogCollectorService {
-    // The type of response stream the server will send back to the client calling it;
+    // The type of response stream the server will send back to the client calling it
     //
     // Client sends a stream of incoming logs(RawLog messages).
     // The server sends the client back a stream of responses(CollectResponse messages).
@@ -45,13 +46,27 @@ impl crate::proto::collector::log_collector_server::LogCollector for LogCollecto
     // back: a response that contains its outgoing stream.
     //
     // Basically, a client starts sending logs, and log collector starts replying as it processes them.
+    #[instrument(
+        name = "core_agent_rpc::stream_log",
+        target = "server::server::streaming_rpc",
+        skip_all,
+        level = "debug"
+    )]
     async fn stream_log(
         &self,
         request: Request<tonic::Streaming<RawLog>>,
     ) -> Result<Response<Self::StreamLogStream>, Status> {
         // Extract the stream of RawLog messages from the request
         let inbound_log_stream = request.into_inner();
+        tracing::debug!(
+            request_stream = ?inbound_log_stream,
+            "Extracted unstructured observability data from request made to core agent"
+        );
 
+        tracing::debug!(
+            channel_buffer_size = 32,
+            "Creating channel to send CollectResponse back to client sending unstructured observability data to core agent"
+        );
         // Create a channel to send CollectResponses back to the client calling the Log Collector
         let (tx, rx) = mpsc::channel(32);
 
@@ -59,6 +74,9 @@ impl crate::proto::collector::log_collector_server::LogCollector for LogCollecto
         let log_buffer_batcher = self.buffer_batcher.clone();
         let log_shipper = self.shipper.clone();
 
+        tracing::debug!(
+            "Spawning background asynchronous task to handle incoming unstructured observability data stream"
+        );
         // Spawn a background task to handle the incoming stream of logs
         tokio::spawn(async move {
             let mut inbound_logs = inbound_log_stream;
@@ -68,21 +86,38 @@ impl crate::proto::collector::log_collector_server::LogCollector for LogCollecto
                         let line = raw_log.raw_line;
                         let mut buffer = log_buffer_batcher.lock().await; // Acquire InMemoryBuffer lock to safely access shared InMemoryBuffer
                         let shipper = log_shipper.lock().await; // Acquire Shipper lock to safely access it
+                        tracing::debug!(
+                            unstructured_data = %line,
+                            inmemory_buffer_lock = ?buffer,
+                            shipper_lock = ?shipper,
+                            "Acquiring InMemoryBuffer and Shipper locks before processing unstructured observability data received from stream"
+                        );
 
                         // Actual log processing logic
                         match process_log_line(&mut *buffer, &*shipper, line.clone()).await {
                             Ok(_) => {
+                                tracing::info!(
+                                    unstructured_data = %line,
+                                    "Successfully processed unstructured observability data received from stream"
+                                );
                                 let _ = tx.send(Ok(CollectResponse { accepted: true })).await;
                             }
                             Err(e) => {
-                                eprintln!("Log processing error: {}", e);
+                                tracing::error!(
+                                    error = %e,
+                                    unstructured_data = %line,
+                                    "Error processing unstructured observability data received from stream"
+                                );
                                 let _ = tx.send(Ok(CollectResponse { accepted: false })).await;
                             }
                         }
                     }
                     Err(e) => {
                         // Network or stream error
-                        eprintln!("Error receiving log: {}", e);
+                        tracing::error!(
+                            error = %e,
+                            "Error receiving unstructured observability data from stream"
+                        );
                         let _ = tx.send(Ok(CollectResponse { accepted: false })).await;
                     }
                 }
@@ -90,6 +125,9 @@ impl crate::proto::collector::log_collector_server::LogCollector for LogCollecto
         });
         // Convert the receiver into a stream response.
         let response_stream = ReceiverStream::new(rx);
+        tracing::debug!(
+            "Converting channel receiver background asynchronous task is writing into a response stream"
+        );
         Ok(Response::new(
             Box::pin(response_stream) as Self::StreamLogStream
         ))
