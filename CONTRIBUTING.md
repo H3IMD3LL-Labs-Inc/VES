@@ -1,9 +1,7 @@
 # 🤝 Contributing to VES
 
 Thank you for your interest in contributing :)
-VES is still in its early stage (`v0.1.0`), so contributions of **any size** — from filing issues, adding features to just using VES and giving your thoughts — are valuable. Before you start writing any code you should:
-
-- Be willing to sign the contributor's agreement. This is triggered on your first PR contribution, signing the CLA allows us to review and accept your amazing contribution PRs.
+VES is still in its early stage (`v0.1.0`), so contributions of **any size** — from filing issues, adding features to just using VES and giving your thoughts — are valuable.
 
 ---
 
