@@ -1,8 +1,11 @@
-use lazy_static::lazy_static;
+// Local crates
 use prometheus::{
     Counter, Encoder, Gauge, Histogram, TextEncoder, register_counter, register_gauge,
     register_histogram,
 };
+
+// External crates
+use lazy_static::lazy_static;
 use std::time::Instant;
 
 /// Helper to observe histogram duration
