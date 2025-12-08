@@ -140,9 +140,15 @@ The goal is to release a stable version `v1.0.0` prior to the new year.
 
 ## Contributing
 
-All contributions make VES better and help achieve the goals set out for the project <3.
+All contributions make VES better and help achieve the goals set out for the project. See [How can I contribute](contributing.md) and star the repo 🌟
 
-See [How can I contribute](contributing.md)
+<a href="https://www.star-history.com/#H3IMD3LL-Labs-Inc/VES&type=date&legend=top-left">
+ <picture>
+   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/svg?repos=H3IMD3LL-Labs-Inc/VES&type=date&theme=dark&legend=top-left" />
+   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/svg?repos=H3IMD3LL-Labs-Inc/VES&type=date&legend=top-left" />
+   <img alt="Star History Chart" src="https://api.star-history.com/svg?repos=H3IMD3LL-Labs-Inc/VES&type=date&legend=top-left" />
+ </picture>
+</a>
 
 ## LICENSE
 
