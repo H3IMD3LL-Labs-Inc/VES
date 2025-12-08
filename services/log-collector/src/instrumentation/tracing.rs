@@ -8,7 +8,7 @@ pub fn init_tracing() {
     let file_appender = rolling::daily("/var/log/ves", "ves_runtime.log");
     let (non_blocking_writer, _guard) = tracing_appender::non_blocking(file_appender);
 
-    let filter = EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("trace"));
+    let filter = EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("debug"));
 
     let fmt_layer = fmt::layer()
         .with_writer(non_blocking_writer)
