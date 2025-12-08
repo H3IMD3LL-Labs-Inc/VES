@@ -50,20 +50,20 @@ pub struct Tailer {
 /// Tailer initialization
 impl Tailer {
     #[instrument(
-        name = "ves_create_new_log_file_tailer",
+        name = "core_agent_tailer::new",
         target = "tailer::tailer::Tailer",
         skip_all,
-        level = "trace"
+        level = "debug"
     )]
     pub async fn new_tailer(&mut self) -> Result<()> {
         // Open the file
-        tracing::trace!(
+        tracing::debug!(
             log_file_path = %self.file_path.display(),
             "Opening file to start tailing"
         );
         let mut file = match File::open(&self.file_path).await {
             Ok(file) => {
-                tracing::trace!(
+                tracing::debug!(
                     log_file_path = %self.file_path.display(),
                     "Successfully opened log file"
                 );
@@ -84,7 +84,7 @@ impl Tailer {
         };
 
         // Seek to the provided offset (to allow resumption from checkpoint)
-        tracing::trace!(
+        tracing::debug!(
             log_file_path = %self.file_path.display(),
             offset = %self.file_offset,
             "Seeking to file offset before tailing"
@@ -98,7 +98,7 @@ impl Tailer {
             );
             return Err(err.into());
         }
-        tracing::trace!(
+        tracing::debug!(
             log_file_path = %self.file_path.display(),
             offset = %self.file_offset,
             "Successfully seeked file to specified offset"
@@ -106,7 +106,7 @@ impl Tailer {
 
         // BufReader wrapper to allow efficient line reading
         self.reader = Some(BufReader::new(file));
-        tracing::trace!(
+        tracing::debug!(
             log_file_path = %self.file_path.display(),
             "BufReader initialized for new tailer"
         );
@@ -116,17 +116,17 @@ impl Tailer {
 
     /// Orchestration loop for spawned Tailer
     #[instrument(
-        name = "ves_run_log_file_tailer",
+        name = "core_agent_tailer::run",
         target = "tailer::tailer::Tailer",
         skip_all,
-        level = "trace"
+        level = "debug"
     )]
     pub async fn run_tailer(
         &mut self,
         mut shutdown_rx: tokio::sync::watch::Receiver<bool>,
     ) -> Result<()> {
         // Get access to the file handle (from self or the BufReader returned by new_tailer())
-        tracing::trace!("Fetching handle to log file returned when tailer was spawned");
+        tracing::debug!("Fetching handle to log file returned when tailer was spawned");
         let reader = self.reader.as_mut().expect("Tailer not initialized!");
 
         let mut line = String::new();
@@ -152,10 +152,11 @@ impl Tailer {
                         tracing::debug!(
                             log_file_path = %self.file_path.display(),
                             log_line = %line,
-                            buffer_lock = ?buffer,
+                            inmemory_buffer_lock = ?buffer,
                             shipper_lock = ?shipper,
-                            "Attempting to process log line"
+                            "Acquiritng InMemoryBuffer and Shipper locks before processing unstructured observability data received from stream"
                         );
+
                         match process_log_line(
                             &mut *buffer,
                             &*shipper,
@@ -163,11 +164,11 @@ impl Tailer {
                         )
                         .await {
                             Ok(status) => {
-                                tracing::trace!(
+                                tracing::info!(
                                     log_file_path = %self.file_path.display(),
                                     status = %status,
                                     log_line = %line,
-                                    "Successfully processed log"
+                                    "Successfully processed unstructured observability data"
                                 );
                             }
                             Err(err) => {
@@ -175,21 +176,21 @@ impl Tailer {
                                     log_file_path = %self.file_path.display(),
                                     error = %err,
                                     line = %line,
-                                    "Error processing log"
+                                    "Error processing unstructured observability data"
                                 );
                             }
                         }
                     } // InMemoryBuffer lock released automatically
-                    tracing::trace!(
+                    tracing::debug!(
                         log_file_path = %self.file_path.display(),
                         log_line = %line,
-                        "Clearing log line, before processing next log line"
+                        "Clearing unstructured observability data, before processing next unstructured observability data"
                     );
                     line.clear();
                 }
                 _ = shutdown_rx.changed() => {
                     if *shutdown_rx.borrow() {
-                        tracing::trace!(
+                        tracing::debug!(
                             log_file_path = %self.file_path.display(),
                             "Running Tailer received shutdown signal, acquiring InMemoryBuffer and Shipper locks"
                         );
@@ -204,7 +205,7 @@ impl Tailer {
                                 buffer_lock = ?buffer,
                                 shipper_lock = ?shipper,
                                 error = %err,
-                                "Error flushing InMemoryBuffer on shutdown"
+                                "Error flushing InMemoryBuffer on graceful shutdown"
                             );
                         }
                         break;
@@ -214,7 +215,7 @@ impl Tailer {
         }
 
         // Flush offsets/cleanup
-        tracing::trace!("Running Tailer stopped");
+        tracing::info!("Running Tailer stopped");
         Ok(())
     }
 }

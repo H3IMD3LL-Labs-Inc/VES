@@ -29,7 +29,7 @@ use tracing::instrument;
     name = "core_agent_runtime::run",
     target = "runtime::runtime",
     skip_all,
-    level = "trace"
+    level = "debug"
 )]
 pub async fn run_log_collector(config_path: PathBuf) -> Result<()> {
     tracing::info!("Starting Core Agent runtime");
