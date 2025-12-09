@@ -171,8 +171,12 @@ pub async fn run_log_collector(config_path: PathBuf) -> Result<()> {
     // Initialize Log Collector shared sub-systems
     tracing::debug!("Initializing Core Agent internal data processing components");
 
-    let buffer = Arc::new(Mutex::new(InMemoryBuffer::new(cfg.buffer).await));
-    let shipper = Arc::new(Mutex::new(Shipper::new(cfg.shipper).await));
+    let buffer_instance = InMemoryBuffer::new(cfg.buffer)
+        .await
+        .map_err(|e| anyhow::anyhow!(e))?;
+    let buffer = Arc::new(Mutex::new(buffer_instance));
+    let shipper_instance = Shipper::new(cfg.shipper).await;
+    let shipper = Arc::new(Mutex::new(shipper_instance));
     let parser = Default::default(); // TODO: Replace with configurable parser, leave as is for now....
 
     tracing::debug!(
