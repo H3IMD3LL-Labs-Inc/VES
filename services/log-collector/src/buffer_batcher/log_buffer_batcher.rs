@@ -39,13 +39,13 @@ pub enum Durability {
 
 impl InMemoryBuffer {
     #[instrument(
-        name = "ves_inmemory_buffer_create",
+        name = "core_agent_buffer::new",
         target = "buffer_batcher::log_buffer_batcher::InMemoryBuffer",
         skip_all,
-        level = "trace"
+        level = "debug"
     )]
     pub async fn new(buffer_config: BufferConfig) -> Result<Self, String> {
-        tracing::debug!(
+        tracing::info!(
             in_memory_buffer_configuration = ?buffer_config,
             "Creating new InMemoryBuffer using buffer configurations"
         );
@@ -131,6 +131,7 @@ impl InMemoryBuffer {
             }
         };
 
+        tracing::info!("Successfully created new InMemoryBuffer");
         Ok(Self {
             queue,
             buffer_capacity: buffer_config.buffer_capacity,
@@ -153,13 +154,13 @@ impl InMemoryBuffer {
     /// - The underlying durability layer (SQLite or InMemory) is gracefully closed.
     /// - No further writes should be attempted after shutdown.
     #[instrument(
-        name = "ves_inmemory_buffer_shutdown_signal",
+        name = "core_agent_buffer::shutdown",
         target = "buffer_batcher::log_buffer_batcher::InMemoryBuffer",
         skip_all,
-        level = "trace"
+        level = "debug"
     )]
     pub async fn shutdown(&mut self) -> Result<()> {
-        tracing::warn!("Shutdown signal received, InMemoryBuffer shutdown initiated");
+        tracing::info!("Shutdown signal received, InMemoryBuffer shutdown initiated");
 
         // Wake all waiting tasks, ensuring no task remains blocked waiting
         // for capacity during shutdown
@@ -178,25 +179,25 @@ impl InMemoryBuffer {
                     "Error flushing remaining logs from InMemoryBuffer"
                 );
             } else {
-                tracing::info!(
+                tracing::debug!(
                     logs_in_inmemory_buffer = %self.queue.len(),
                     "Successfully flushed remaining logs from InMemoryBuffer"
                 );
             }
         } else {
-            tracing::info!("No remaining logs to flush from InMemoryBuffer");
+            tracing::debug!("No remaining logs to flush from InMemoryBuffer");
         }
 
         // Release durability layer resources
         match &mut self.durability {
             Durability::SQLite(pool) => {
-                tracing::info!("Releasing SQLite connection pool");
+                tracing::debug!("Releasing SQLite connection pool");
                 // Dropping Arc<Pool> reference allows connections to close naturally.
                 // No explicit close method exists for r2d2 pools.
                 let _ = Arc::get_mut(pool);
             }
             Durability::InMemory => {
-                tracing::info!(
+                tracing::debug!(
                     "Currently using in-memory durability, no persistent SQLite connection pool to close"
                 );
             }
@@ -224,10 +225,10 @@ impl InMemoryBuffer {
     /// Logs in the buffer are persisted to SQLite after each `push_back`
     /// to the buffer. If persistence configuration is set to `SQLite`
     #[instrument(
-        name = "ves_inmemory_buffer_push",
+        name = "core_agent_buffer::push",
         target = "buffer_batcher::log_buffer_batcher::InMemoryBuffer",
         skip_all,
-        level = "trace"
+        level = "debug"
     )]
     pub async fn push(&mut self, log: NormalizedLog) -> Result<()> {
         // TODO: increment_counter!("normalizedlogs.buffered");
@@ -280,10 +281,10 @@ impl InMemoryBuffer {
     ///
     /// Returns flushed `NormalizedLog` batch after flush is triggered.
     #[instrument(
-        name = "ves_inmemory_buffer_flush",
+        name = "core_agent_buffer::flush",
         target = "buffer_batcher::log_buffer_batcher::InMemoryBuffer",
         skip_all,
-        level = "trace"
+        level = "debug"
     )]
     pub async fn flush(&mut self, log: NormalizedLog) -> Result<Option<InMemoryBuffer>> {
         // Variables to store user configured flush triggers
@@ -404,14 +405,14 @@ impl InMemoryBuffer {
     }
 
     #[instrument(
-        name = "ves_inmemory_buffer_flush_remaining_logs",
+        name = "core_agent_buffer::flush_remaining",
         target = "buffer_batcher::log_buffer_batcher::InMemoryBuffer",
         skip_all,
-        level = "trace"
+        level = "debug"
     )]
     pub async fn flush_remaining_logs(&mut self) -> Result<()> {
         if self.queue.is_empty() {
-            tracing::debug!(
+            tracing::info!(
                 remaining_logs = 0,
                 "No remaining NormalizedLogs in InMemoryBuffer to flush"
             );
@@ -483,10 +484,10 @@ impl InMemoryBuffer {
     /// **Use Cases**:
     /// - `NormalizedLog` batch has been flushed to SQLite persistence **flush()**.
     #[instrument(
-        name = "ves_inmemory_buffer_drain",
+        name = "core_agent_buffer::drain",
         target = "buffer_batcher::log_buffer_batcher::InMemoryBuffer",
         skip_all,
-        level = "trace"
+        level = "debug"
     )]
     pub async fn drain(&mut self) -> Result<()> {
         match self.drain_policy.as_str() {
@@ -553,10 +554,10 @@ impl InMemoryBuffer {
     /// to `InMemoryBuffer`. An `InMemoryBuffer` overflowing is handled prior to pushing
     /// `NormalizedLog` to it.
     #[instrument(
-        name = "ves_inmemory_buffer_overflow",
+        name = "core_agent_buffer::overflow",
         target = "buffer_batcher::log_buffer_batcher::InMemoryBuffer",
         skip_all,
-        level = "trace"
+        level = "debug"
     )]
     async fn handle_overflow(&mut self) -> Result<bool> {
         match self.overflow_policy.as_str() {

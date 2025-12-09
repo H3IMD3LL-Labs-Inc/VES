@@ -22,17 +22,20 @@ lazy_static::lazy_static! {
 /// Internal helper function to perform actual log processing logic on a raw log received locally(same node as log
 /// collector) or over-the-wire(different node as log collector).
 #[instrument(
-    name = "processing_raw_log_line",
+    name = "core_agent_pipeline::processing",
     target = "helpers::log_processing",
     skip_all,
-    level = "trace"
+    level = "debug"
 )]
 pub async fn process_log_line(
     buffer_batcher: &mut InMemoryBuffer,
     shipper: &Shipper,
     line: String,
 ) -> Result<String, String> {
-    tracing::trace!(line = &line, "Starting to process raw log line");
+    tracing::info!(
+        unstructured_data = &line,
+        "Starting to process unstructured observability data"
+    );
 
     // Start measuring how long processing the log line takes
     let start = Instant::now();
@@ -48,19 +51,26 @@ pub async fn process_log_line(
         LOGS_PROCESSED_THIS_SECOND.inc();
     };
 
-    tracing::trace!(
-        line = &line,
-        "Selecting parser and parsing incoming raw log line",
+    tracing::debug!(
+        unstructured_data = &line,
+        "Selecting parser and parsing incoming unstructured observability data",
     );
     // Parse the RawLog line into NormalizedLog format
     let parsed_log = match NormalizedLog::select_parser(&line).await {
         Ok(p) => {
-            tracing::debug!(line = &line, "Successfully parsed raw log line");
+            tracing::debug!(
+                unstructured_data = &line,
+                "Successfully parsed unstructured observability data"
+            );
             p
         }
         Err(e) => {
             let msg = format!("Failed to parse raw log line: {}, {}", &line, e);
-            tracing::error!(line = &line, error = %e, message = %msg);
+            tracing::error!(
+                error = %e,
+                unstructured_data = &line,
+                message = %msg
+            );
             record_prometheus_metrics();
             return Err(msg);
         }
@@ -77,7 +87,7 @@ pub async fn process_log_line(
 
     tracing::debug!(
         queue_len = buffer_batcher.queue.len(),
-        "Log pushed to in-memory buffer"
+        "Observability data pushed to InMemoryBuffer"
     );
 
     let queue_len = buffer_batcher.queue.len();
@@ -90,22 +100,22 @@ pub async fn process_log_line(
     // Determine whether to flush the InMemoryBuffer
     let should_flush = size_triggered || timeout_triggered;
 
-    tracing::trace!(
+    tracing::debug!(
         queue_len,
         batch_size,
         elapsed_ms,
         timeout_ms,
         size_triggered,
         timeout_triggered,
-        "Evaluating whether InMemoryBuffer should flush"
+        "Evaluating InMemoryBuffer flush conditions"
     );
 
     // Flush InMemoryBuffer based on user configured flush conditions
     if should_flush {
-        tracing::info!("Flush condition met, attempting flush");
+        tracing::info!("InMemoryBuffer flush condition met");
 
         if size_triggered {
-            tracing::info!(
+            tracing::debug!(
                 trigger = "batch_size",
                 queue_len,
                 batch_size,
@@ -114,7 +124,7 @@ pub async fn process_log_line(
         }
 
         if timeout_triggered {
-            tracing::info!(
+            tracing::debug!(
                 trigger = "timeout_ms",
                 elapsed_ms,
                 timeout_ms,
@@ -125,9 +135,9 @@ pub async fn process_log_line(
         // TODO: cloning parsed_log is an inefficiency
         match buffer_batcher.flush(parsed_log.clone()).await {
             Ok(Some(flushed_buffer)) => {
-                tracing::info!(
+                tracing::debug!(
                     flushed_count = flushed_buffer.queue.len(),
-                    "Flushed logs successfully"
+                    "Flushed data from InMemoryBuffer successfully"
                 );
 
                 if let Err(e) = shipper.send(flushed_buffer.clone()).await {
@@ -137,7 +147,7 @@ pub async fn process_log_line(
                     return Err(msg);
                 }
 
-                tracing::info!("Shipper successfully sent flushed logs");
+                tracing::info!("Shipper successfully sent flushed data");
 
                 record_prometheus_metrics();
                 return Ok(format!(
@@ -146,9 +156,11 @@ pub async fn process_log_line(
                 ));
             }
             Ok(None) => {
-                tracing::debug!("Flush was triggered but no logs were available/present to flush");
+                tracing::debug!(
+                    "InMemoryBuffer flush was triggered but no data available/present to flush"
+                );
                 record_prometheus_metrics();
-                return Ok("No logs to flush".into());
+                return Ok("No data to flush".into());
             }
             Err(e) => {
                 let msg = format!("Flush error: {}", e);
@@ -158,8 +170,8 @@ pub async fn process_log_line(
             }
         }
     } else {
-        tracing::trace!("InMemoryBuffer flush conditions not met, not flushing processed log");
+        tracing::debug!("InMemoryBuffer flush conditions not met, not flushing processed data");
         record_prometheus_metrics();
-        return Ok("Log buffered successfully, not flushed.".into());
+        return Ok("Data buffered successfully, not flushed.".into());
     };
 }

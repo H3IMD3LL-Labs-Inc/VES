@@ -251,10 +251,10 @@ impl Checkpoint {
 impl LogWatcher {
     /// Creates a new log watcher instance and loads the last checkpoint, if it exists.
     #[instrument(
-        name = "ves_create_new_log_watcher",
+        name = "core_agent_local_watcher::new",
         target = "watcher::watcher::LogWatcher",
         skip_all,
-        level = "trace"
+        level = "debug"
     )]
     pub async fn new_watcher(
         log_dir: PathBuf,
@@ -263,7 +263,7 @@ impl LogWatcher {
         recursive: Option<bool>,
         service: Arc<LogCollectorService>,
     ) -> Result<Self> {
-        tracing::trace!("Creating new in-memory Checkpoint files storage");
+        tracing::debug!("Creating new in-memory Checkpoint files storage");
         let mut checkpoint = Checkpoint {
             files: HashMap::new(),
         };
@@ -271,12 +271,13 @@ impl LogWatcher {
         // Measure snapshot recovery duration
         let recovery_start = Instant::now();
 
-        tracing::trace!("Attempting to load file checkpoint");
+        tracing::debug!("Attempting to load file checkpoint");
         checkpoint.load_checkpoint(&checkpoint_path).await?;
 
         let recovery_duration = recovery_start.elapsed().as_secs_f64();
         SNAPSHOT_RECOVERY_DURATION_SECONDS.set(recovery_duration);
 
+        tracing::info!("Creating new local observability data file watcher");
         Ok(Self {
             log_dir,
             checkpoint_path,
@@ -292,16 +293,16 @@ impl LogWatcher {
 
     /// Main async loop that orchestrates the watcher
     #[instrument(
-        name = "ves_run_log_watcher",
+        name = "core_agent_local_watcher::run",
         target = "watcher::watcher::LogWatcher",
         skip_all,
-        level = "trace"
+        level = "debug"
     )]
     pub async fn run_watcher(
         &mut self,
         mut shutdown_rx: tokio::sync::broadcast::Receiver<()>,
     ) -> Result<()> {
-        tracing::trace!("Starting local file watcher");
+        tracing::debug!("Starting LogWatcher");
 
         let (tx, rx) = tokio::sync::mpsc::channel(100);
 
@@ -314,7 +315,10 @@ impl LogWatcher {
                         let _ = tx.blocking_send(event);
                     }
                     Err(e) => {
-                        tracing::error!("Local file watcher error callback: {e}");
+                        tracing::error!(
+                            error = %e,
+                            "LogWatcher error callback"
+                        );
                     }
                 }
             },
@@ -328,7 +332,7 @@ impl LogWatcher {
         };
 
         tracing::debug!(
-            "Watching directory {:?} (recursive = {:?})",
+            "Configured LogWatcher observability data directory {:?} (recursive_behavior = {:?})",
             self.log_dir,
             self.recursive
         );
@@ -338,42 +342,45 @@ impl LogWatcher {
         let mut event_rx = tokio_stream::wrappers::ReceiverStream::new(rx);
         let poll_interval = self.poll_interval_ms.unwrap_or(5000); // Incase of error default to 5000ms/5secs
 
-        tracing::debug!("Running LogWatcher set poll interval = {}ms", poll_interval);
+        tracing::debug!(
+            "Running LogWatcher with set poll interval = {}ms",
+            poll_interval
+        );
 
         self.discover_initial_files().await?;
 
-        tracing::trace!("Starting LogWatcher main event loop");
+        tracing::debug!("Starting LogWatcher main event loop");
         loop {
             tokio::select! {
                 Some(event) = event_rx.next() => {
-                    tracing::trace!("FileSystem event received by the running LogWatcher");
+                    tracing::debug!("FileSystem event received by the running LogWatcher");
                     self.handle_event(event).await?;
                 }
                 _ = tokio::time::sleep(tokio::time::Duration::from_millis(poll_interval)) => {
-                    tracing::trace!("Triggering LogWatcher periodic file discovery cycle");
+                    tracing::debug!("Triggering LogWatcher periodic file discovery sleep cycle");
                     self.discover_new_files().await?;
                 }
                 Ok(_) = shutdown_rx.recv() => {
-                    tracing::trace!("Running LogWatcher received shutdown signal");
+                    tracing::info!("Running LogWatcher received shutdown signal");
                     self.shutdown().await;
                     break;
                 }
             }
         }
 
-        tracing::trace!("Running LogWatcher loop exited cleanly");
+        tracing::debug!("Running LogWatcher loop exited cleanly");
         Ok(())
     }
 
     /// Broadcast shutdown signal to all Tailers runnings and await them
     #[instrument(
-        name = "ves_log_watcher_shutdown_signal_propagate",
+        name = "core_agent_local_watcher::shutdown",
         target = "watcher::watcher::LogWatcher",
         skip_all,
-        level = "trace"
+        level = "debug"
     )]
     pub async fn shutdown(&mut self) {
-        tracing::trace!(
+        tracing::debug!(
             running_tailers = %self.tailer_shutdown_txs.len(),
             "Broadcasting shutdown signal to all running Tailers"
         );
@@ -388,24 +395,27 @@ impl LogWatcher {
             let _ = handle.await;
         }
 
-        tracing::trace!("Watcher successfully shutdown gracefully");
+        tracing::debug!("LogWatcher has gracefully shutdown successfully");
     }
 
-    /// Handles file system events from the `notify` watcher
+    /// FileSystem event handling logic
     #[instrument(
-        name = "ves_log_watcher_file_system_event",
+        name = "core_agent_local_watcher::filesystem",
         target = "watcher::watcher::LogWatcher",
         skip_all,
-        level = "trace"
+        level = "debug"
     )]
     async fn handle_event(&mut self, event: Event) -> Result<()> {
-        tracing::trace!("Handling incoming filesystem event");
+        tracing::debug!(
+            filesystem_event = ?event,
+            "Handling incoming filesystem event"
+        );
 
         match event.kind {
             notify::EventKind::Create(notify::event::CreateKind::File) => {
-                tracing::trace!("File created event");
+                tracing::info!("File created event");
                 for path in &event.paths {
-                    tracing::trace!(?path, "New file detected in the filesystem");
+                    tracing::debug!(?path, "New file detected in the filesystem");
                     let metadata = tokio::fs::metadata(path).await?;
                     let inode = metadata.ino();
                     self.handle_new_file(inode, path).await?;
@@ -413,16 +423,16 @@ impl LogWatcher {
             }
             // TODO: Implement handle_file_change() to make this functional
             notify::EventKind::Modify(notify::event::ModifyKind::Data(_)) => {
-                tracing::trace!("File modified event");
+                tracing::info!("File modified event");
                 for path in &event.paths {
-                    tracing::trace!(?path, "File change detected");
+                    tracing::debug!(?path, "File change detected");
                     self.handle_file_change(path).await?;
                 }
             }
             notify::EventKind::Remove(notify::event::RemoveKind::File) => {
-                tracing::trace!("File removed event");
+                tracing::info!("File removed event");
                 for path in &event.paths {
-                    tracing::trace!(?path, "File removal detected");
+                    tracing::debug!(?path, "File removal detected");
                     self.handle_file_removal(path).await?;
                 }
             }
@@ -433,7 +443,10 @@ impl LogWatcher {
                 // primarily on the `Create` and `Remove` events.
             }*/
             other => {
-                tracing::debug!(?other, "Unfamiliar filesystem event, unhandled");
+                tracing::debug!(
+                    ?other,
+                    "Unfamiliar filesystem event, this event has not been handled"
+                );
             }
         }
 
@@ -453,15 +466,15 @@ impl LogWatcher {
     ///
     /// [TODO]: Store handles to manage each new tailer created.
     #[instrument(
-        name = "ves_log_watcher_initial_files_discovery",
+        name = "core_agent_local_watcher::discovery",
         target = "watcher::watcher::LogWatcher",
         skip_all,
-        level = "trace"
+        level = "debug"
     )]
     async fn discover_initial_files(&mut self) -> Result<()> {
-        tracing::trace!(
+        tracing::info!(
             log_dir = %self.log_dir.display(),
-            "Reading configured log_dir to identify initial local log files to process"
+            "Checking configured log_dir to identify initial observability data files to process"
         );
         let mut entries = tokio::fs::read_dir(&self.log_dir).await?;
 
@@ -471,11 +484,14 @@ impl LogWatcher {
         while let Some(entry) = entries.next_entry().await? {
             let path = entry.path();
 
-            tracing::trace!(?path, "Found directory entry");
+            tracing::info!(?path, "Found observability data directory entry");
 
             // Only handle .log files
             if path.extension().map_or(false, |ext| ext == "log") {
-                tracing::debug!(?path, "Identified .log file");
+                tracing::debug!(
+                    ?path,
+                    "Identified .log file in observability data directory"
+                );
                 // Check if a checkpoint for this file already exists
                 let (inode, offset) = match tokio::fs::metadata(&path).await {
                     Ok(metadata) => (metadata.ino(), {
@@ -486,11 +502,15 @@ impl LogWatcher {
                             .unwrap_or(0)
                     }),
                     Err(e) => {
-                        tracing::error!(?path, error = %e, "Failed to load metadata for log file");
+                        tracing::error!(
+                            error = %e,
+                            ?path,
+                            "Failed to load metadata for log file"
+                        );
                         continue;
                     }
                 };
-                tracing::trace!(
+                tracing::debug!(
                     ?path,
                     inode,
                     offset,
@@ -511,11 +531,11 @@ impl LogWatcher {
                     reader: None,
                     service: Arc::clone(&self.service),
                 };
-                tracing::trace!(
+                tracing::debug!(
                     ?path,
                     inode,
                     offset,
-                    "Spawning tailer for discovered log file"
+                    "Spawning Tailer for discovered log file"
                 );
 
                 let handle = tokio::spawn(
@@ -524,7 +544,7 @@ impl LogWatcher {
                             tracing::error!(
                                 ?tailer.file_path,
                                 error = %e,
-                                "Failed to initialize tailer"
+                                "Failed to initialize Tailer"
                             );
                             return;
                         }
@@ -544,7 +564,7 @@ impl LogWatcher {
 
                 // If file is new(has no checkpoint), save it
                 if !self.checkpoint.files.contains_key(&path) {
-                    tracing::trace!(?path, inode, "Saving initial checkpoint for new log file");
+                    tracing::debug!(?path, inode, "Saving initial checkpoint for new log file");
                     self.checkpoint
                         .save_checkpoint(&self.checkpoint_path, path, inode, 0)
                         .await?;
@@ -552,7 +572,7 @@ impl LogWatcher {
             }
         }
 
-        tracing::trace!("Initial log file(s) discovery completed");
+        tracing::info!("Initial log file(s) discovery completed");
         Ok(())
     }
 
@@ -562,13 +582,13 @@ impl LogWatcher {
     /// possible to miss file creation events (e.g., when the system reboots, rotated logs, or a symlink
     /// change). This periodically scans the directory again.
     #[instrument(
-        name = "ves_log_watcher_runtime_files_discovery",
+        name = "core_agent_local_watcher::new_files",
         target = "watcher::watcher::LogWatcher",
         skip_all,
-        level = "trace"
+        level = "debug"
     )]
     pub async fn discover_new_files(&mut self) -> Result<()> {
-        tracing::trace!(
+        tracing::info!(
             log_dir = %self.log_dir.display(),
             "Reading log_dir to identify new log files to process"
         );
@@ -577,7 +597,7 @@ impl LogWatcher {
         while let Some(entry) = entries.next_entry().await? {
             let path = entry.path();
 
-            tracing::trace!(?path, "Found new log_dir log file entry");
+            tracing::info!(?path, "Found new log_dir log file entry");
 
             // Only consider `.log` files
             if path.extension().map_or(false, |ext| ext == "log") {
@@ -585,13 +605,13 @@ impl LogWatcher {
                 let metadata = entry.metadata().await?;
                 let inode = metadata.ino();
 
-                tracing::trace!(?path, "Handling new .log file discovered in log_dir");
+                tracing::debug!(?path, "Handling new .log file discovered in log_dir");
                 self.handle_new_file(inode, &path).await?;
             }
         }
 
         // TODO: Display the log file's actual path as well as log_dir
-        tracing::trace!(
+        tracing::info!(
             log_dir = %self.log_dir.display(),
             "Discovered and handled new .log file in log_dir"
         );
@@ -604,13 +624,13 @@ impl LogWatcher {
     /// helper so both event-based (`notify`) and polling-based (`discover_new_files()`) systems
     /// can use it.
     #[instrument(
-        name = "ves_log_watcher_new_log_files_handling",
+        name = "core_agent_local_watcher::handle_new_file",
         target = "watcher::watcher::LogWatcher",
         skip_all,
-        level = "trace"
+        level = "debug"
     )]
     async fn handle_new_file(&mut self, inode: u64, path: &Path) -> Result<()> {
-        tracing::trace!(
+        tracing::info!(
             log_file_inode = %inode,
             "Checking if the log file exists in active_files before inserting into active_files"
         );
@@ -622,7 +642,7 @@ impl LogWatcher {
             return Ok(());
         }
 
-        tracing::trace!(
+        tracing::info!(
             log_file_inode = %inode,
             log_file_path = %path.display(),
             "Inserting new log file to active_files"
@@ -638,14 +658,14 @@ impl LogWatcher {
             reader: None,
             service: Arc::clone(&self.service),
         };
-        tracing::trace!(
+        tracing::debug!(
             ?path,
             inode,
             %tailer.file_offset,
             ?tailer.file_handle,
             ?tailer.reader,
             ?tailer.service,
-            "Spawning new tailer for newly disovered file"
+            "Spawning new Tailer for newly disovered file"
         );
 
         let handle = tokio::spawn(async move {
@@ -669,7 +689,7 @@ impl LogWatcher {
         self.tailer_handles.push(handle);
         self.tailer_shutdown_txs.push(tx);
 
-        tracing::trace!(?path, inode, "Saving initial checkpoint for new log file");
+        tracing::debug!(?path, inode, "Saving initial checkpoint for new log file");
         self.checkpoint
             .save_checkpoint(&self.checkpoint_path, path.to_path_buf(), inode, 0)
             .await?;
@@ -689,10 +709,10 @@ impl LogWatcher {
 
     /// Handles file removal (deletion - whether intentional or accidental)
     #[instrument(
-        name = "ves_log_watcher_log_file_removal_handling",
+        name = "core_agent_local_watcher::handle_file_removal",
         target = "watcher::watcher::LogWatcher",
         skip_all,
-        level = "trace"
+        level = "debug"
     )]
     async fn handle_file_removal(&mut self, path: &Path) -> Result<()> {
         let file_path_buf = path.to_path_buf();
@@ -710,14 +730,14 @@ impl LogWatcher {
                 Ok(metadata) => {
                     // File exists on disk
                     let inode_on_disk = metadata.ino();
-                    tracing::trace!(
+                    tracing::info!(
                         file_path = ?file_path_buf,
                         file_disk_inode = %inode_on_disk,
                         "File exists on disk"
                     );
 
                     if inode_on_disk != file_state.inode {
-                        // Inode differe -> file was rotated/replaced
+                        // Inode differs -> file was rotated/replaced
                         tracing::warn!(
                             file_path = ?file_path_buf,
                             old_inode = %file_state.inode,
@@ -736,7 +756,7 @@ impl LogWatcher {
                             .await?;
                     } else {
                         // Same inode -> file is still valid, nothing to do
-                        tracing::trace!(
+                        tracing::debug!(
                             file_path = ?file_path_buf,
                             inode = %inode_on_disk,
                             "File still valid, no action needed"

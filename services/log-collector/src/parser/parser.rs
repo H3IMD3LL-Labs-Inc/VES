@@ -71,10 +71,10 @@ impl NormalizedLog {
     ///
     /// Returns a [`LogFormat`] enum describing the detected type.
     #[instrument(
-        name = "ves_parser_format_detection",
+        name = "core_agent_parser::format_detection",
         target = "parser::parser::NormalizedLog",
         skip_all,
-        level = "trace"
+        level = "debug"
     )]
     pub async fn detect_format(line: &str) -> LogFormat {
         let line = line.trim_start();
@@ -141,7 +141,7 @@ impl NormalizedLog {
     }
 
     #[instrument(
-        name = "ves_parsing_to_normalized_log",
+        name = "core_agent_parser::select_parser",
         target = "parser::parser::NormalizedLog",
         skip_all,
         level = "trace"
@@ -151,7 +151,7 @@ impl NormalizedLog {
         let detected_format = Self::detect_format(line).await;
 
         // Match this format to an appropriate parser for parsing
-        tracing::trace!(
+        tracing::debug!(
             log_line = %line,
             "Attempting raw log parsing to NormalizedLog format"
         );
@@ -175,13 +175,13 @@ impl NormalizedLog {
     ///
     /// Returns provided `LogFormat::CRI` as a `NormalizedLog` struct.
     #[instrument(
-        name = "ves_cri_log_parser",
+        name = "core_agent_parser::CRI_parsing",
         target = "parser::parser::NormalizedLog",
         skip_all,
-        level = "trace"
+        level = "debug"
     )]
     pub async fn cri_parser(line: &str) -> Result<NormalizedLog, String> {
-        tracing::trace!(
+        tracing::info!(
             log_line = %line,
             "Attempting Kubernetes CRI raw log parsing"
         );
@@ -211,7 +211,7 @@ impl NormalizedLog {
                 let flag = Some(parts[2].to_string());
                 let message = parts[3].to_string();
 
-                tracing::trace!(
+                tracing::info!(
                     log_line = %line,
                     "Successfully parsed Kubernetes CRI log to NormalizedLog"
                 );
@@ -245,13 +245,13 @@ impl NormalizedLog {
     ///
     /// Returns provided `LogFormat::DockerJSON` as a `NormalizedLog` struct.
     #[instrument(
-        name = "ves_docker_log_parser",
+        name = "core_agent_parser::DOCKER_parsing",
         target = "parser::parser::NormalizedLog",
         skip_all,
-        level = "trace"
+        level = "debug"
     )]
     pub async fn docker_json_parser(line: &str) -> Result<NormalizedLog, String> {
-        tracing::trace!(
+        tracing::info!(
             log_line = %line,
             "Attempting Docker JSON raw log parsing"
         );
@@ -279,7 +279,7 @@ impl NormalizedLog {
                 let stream = parsed.stream;
                 let message = parsed.log.trim_end().to_string();
 
-                tracing::trace!(
+                tracing::info!(
                     log_line = %line,
                     "Successfully parsed Docker JSON raw log to NormalizedLog"
                 );
@@ -325,13 +325,13 @@ impl NormalizedLog {
     ///
     /// Returns provided `LogFormat::ArbitraryJSON` as a `NormalizedLog` struct.
     #[instrument(
-        name = "ves_json_log_parser",
+        name = "core_agent_parser::JSON_parsing",
         target = "parser::parser::NormalizedLog",
         skip_all,
-        level = "trace"
+        level = "debug"
     )]
     pub async fn arbitrary_json_parser(line: &str) -> Result<NormalizedLog, String> {
-        tracing::trace!(
+        tracing::info!(
             log_line = %line,
             "Attempting arbitrary JSON raw log parsing"
         );
@@ -358,7 +358,7 @@ impl NormalizedLog {
                 });
                 let message = parsed.msg.or(parsed.message).unwrap_or_default();
 
-                tracing::trace!(
+                tracing::info!(
                     log_line = %line,
                     "Successfully parsed arbitrary JSON raw log to NormalizedLog"
                 );
@@ -395,20 +395,20 @@ impl NormalizedLog {
     /// Returns provided `LogFormat::Syslog(SyslogVariant)` as a
     /// `NormalizedLog` struct.
     #[instrument(
-        name = "ves_syslog_log_parser",
+        name = "core_agent_parser::SYSLOG_parser",
         target = "parser::parser::NormalizedLog",
         skip_all,
-        level = "trace"
+        level = "debug"
     )]
     pub async fn syslog_parser(line: &str) -> Result<NormalizedLog, String> {
-        tracing::trace!(
+        tracing::info!(
             log_line = %line,
             "Attempting Syslog raw log parsing"
         );
         match Self::detect_format(line).await {
             // TODO: Improve simplistic log parsing to NormalizedLog
             LogFormat::Syslog(SyslogVariant::RFC5424) => {
-                tracing::trace!(
+                tracing::debug!(
                     log_line = %line,
                     "Parsing RFC5424 raw log to NormalizedLog"
                 );
@@ -423,7 +423,7 @@ impl NormalizedLog {
                 });
                 let message = parts[8].to_string();
 
-                tracing::trace!(
+                tracing::info!(
                     log_line = %line,
                     "Successfully parsed RFC5424 raw log to NormalizedLog"
                 );
@@ -437,7 +437,7 @@ impl NormalizedLog {
             }
             // TODO: Improve simplistic log parsing to NormalizedLog
             LogFormat::Syslog(SyslogVariant::RFC3164) => {
-                tracing::trace!(
+                tracing::debug!(
                     log_line = %line,
                     "Parsing RFC3164 raw log to NormalizedLog"
                 );
@@ -452,7 +452,7 @@ impl NormalizedLog {
                 });
                 let message = parts[4].to_string();
 
-                tracing::trace!(
+                tracing::info!(
                     log_line = %line,
                     "Successfully parsed RFC3164 raw log to NormalizedLog"
                 );

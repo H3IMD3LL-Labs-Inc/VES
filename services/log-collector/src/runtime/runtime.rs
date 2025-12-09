@@ -22,77 +22,65 @@ use std::time::Instant;
 use sysinfo::System;
 use tokio::{signal, sync::Mutex, task::JoinHandle};
 use tonic::transport::Server;
-use tracing::{Instrument, info_span, instrument};
+use tracing::instrument;
 
-/// Log Collector runtime initialization and setup.
-///
-/// This is where the Log Collector creates and starts its runtime environment.
-/// Everything needed at runtime; components, configs, etc. is set here.
+/// Core Agent runtime initialization and setup.
 #[instrument(
-    name = "ves_runtime",
+    name = "core_agent_runtime::run",
     target = "runtime::runtime",
     skip_all,
-    level = "trace"
+    level = "debug"
 )]
 pub async fn run_log_collector(config_path: PathBuf) -> Result<()> {
-    tracing::trace!(
-        configuration_file_path = %config_path.display(),
-        "Starting log collector runtime with configurations"
-    );
+    tracing::info!("Starting Core Agent runtime");
 
     // Start measuring cold start time
     let cold_startup_start = Instant::now();
 
     // Initialize global shutdown channel
     let shutdown = Shutdown::new();
-    tracing::trace!("Initialized global shutdown channel");
+    tracing::debug!("Initialized runtime global shutdown channel");
     let shutdown_signal = shutdown.clone();
 
     // Start Ctrc+C shutdown signal listener
-    tokio::spawn(
-        async move {
-            signal::ctrl_c()
-                .await
-                .expect("Failed to listen for CTRL+C shutdown signal");
-            tracing::trace!("CTRL+C shutdown signal detected, broadcasting shutdown");
-            shutdown_signal.trigger();
-        }
-        // Attach named span for clarity
-        .instrument(info_span!("ves_shutdown_signal_listener")),
-    );
+    tokio::spawn(async move {
+        tracing::info!("Starting CTRL+C global shutdown signal listener");
+        signal::ctrl_c()
+            .await
+            .expect("Failed to listen for CTRL+C shutdown signal");
+        tracing::debug!(
+            "CTRL+C shutdown signal detected, broadcasting shutdown to runtime components"
+        );
+        shutdown_signal.trigger();
+    });
 
-    // Start metrics server (background task)
+    // Start metrics server
     tokio::spawn({
         let mut shutdown_rx = shutdown.subscribe();
         async move {
-            tracing::trace!("Metrics server task started");
+            tracing::info!("Metrics server asynchronous background task started");
 
             tokio::select! {
                 _ = start_metrics_server("0.0.0.0:9000") => {
-                    tracing::trace!("Metrics server task exited normally");
+                    tracing::debug!("Metrics server asynchronous background task exited normally");
                 },
                 _ = shutdown_rx.recv() => {
-                    tracing::trace!("Metrics server task shutting down");
+                    tracing::debug!("Metrics server asynchronous background task gracefully shutting down");
                 }
             }
         }
-        // Attach named span for clarity
-        .instrument(info_span!(
-            "ves_metrics_server",
-            listen_addr = "0.0.0.0:9000"
-        ))
     });
 
-    // Start log throughput auto-refresh background task
+    // Start log throughput auto-refresh
     tokio::spawn({
         let mut shutdown_rx = shutdown.subscribe();
         async move {
-            tracing::trace!("Logs throughput auto-refresh background task started");
+            tracing::debug!("Logs throughput auto-refresh asynchronous background task started");
 
             loop {
                 tokio::select! {
                     _ = shutdown_rx.recv() => {
-                        tracing::trace!("Logs throughput auto-refresh background task shutting down");
+                        tracing::debug!("Logs throughput auto-refresh asynchronous background task gracefully shutting down");
                         break;
                     }
                     _ = tokio::time::sleep(std::time::Duration::from_secs(1)) => {
@@ -108,21 +96,18 @@ pub async fn run_log_collector(config_path: PathBuf) -> Result<()> {
                 }
             }
         }
-        .instrument(info_span!(
-            "ves_log_throughput_updater"
-        ))
     });
 
     // Start p99 latency auto-refresh background task
     tokio::spawn({
         let mut shutdown_rx = shutdown.subscribe();
         async move {
-            tracing::trace!("p99 latency auto-refresh background task started");
+            tracing::debug!("p99 latency auto-refresh asynchronous background task started");
 
             loop {
                 tokio::select! {
                     _ = shutdown_rx.recv() => {
-                        tracing::trace!("p99 latency auto-refresh background task shutting down");
+                        tracing::debug!("p99 latency auto-refresh asynchronous background task shutting down");
                         break;
                     }
                     _ = tokio::time::sleep(std::time::Duration::from_secs(1)) => {
@@ -136,20 +121,19 @@ pub async fn run_log_collector(config_path: PathBuf) -> Result<()> {
                 }
             }
         }
-        .instrument(info_span!("ves_p99_latency_updater"))
     });
 
     // Start memory and CPU usage auto-refresh background task
     tokio::spawn({
         let mut shutdown_rx = shutdown.subscribe();
         async move {
-            tracing::trace!("Node metrics auto-refresh background task started");
+            tracing::debug!("Node metrics auto-refresh asynchronous background task started");
 
             let mut sys = System::new_all();
             loop {
                 tokio::select! {
                     _ = shutdown_rx.recv() => {
-                        tracing::trace!("Node metrics auto-refresh background task started");
+                        tracing::debug!("Node metrics auto-refresh asynchronous background task started");
                         break;
                     }
                     _ = tokio::time::sleep(std::time::Duration::from_secs(5)) => {
@@ -166,41 +150,45 @@ pub async fn run_log_collector(config_path: PathBuf) -> Result<()> {
                             .sum::<f64>() / sys.cpus().len() as f64;
                         CPU_PERCENT_PER_CORE.set(avg_cpu);
 
-                        tracing::trace!(cpu_percent = avg_cpu, mem_bytes = mem_bytes, "Node metrics updated");
+                        tracing::debug!(cpu_percent = avg_cpu, mem_bytes = mem_bytes, "Node metrics updated");
                     }
                 }
             }
         }
-        .instrument(info_span!(
-            "ves_node_metrics_updater"
-        ))
     });
 
-    // Load Log Collector configurations
-    tracing::trace!(
+    // Load Core Agent configurations
+    tracing::info!(
         configuration_file_path = %config_path.display(),
-        "Loading VES configuration file"
+        "Loading Core Agent configuration file"
     );
     let cfg = Config::load(&config_path)?;
-    tracing::trace!(
+    tracing::info!(
         configuration_file_path = %config_path.display(),
-        "VES configuration file loaded successfully"
+        "Core Agent configuration file loaded successfully"
     );
 
     // Initialize Log Collector shared sub-systems
-    tracing::trace!("Initializing VES log processing components");
-    let buffer = Arc::new(Mutex::new(InMemoryBuffer::new(cfg.buffer).await));
-    let shipper = Arc::new(Mutex::new(Shipper::new(cfg.shipper).await));
+    tracing::debug!("Initializing Core Agent internal data processing components");
+
+    let buffer_instance = InMemoryBuffer::new(cfg.buffer)
+        .await
+        .map_err(|e| anyhow::anyhow!(e))?;
+    let buffer = Arc::new(Mutex::new(buffer_instance));
+    let shipper_instance = Shipper::new(cfg.shipper).await;
+    let shipper = Arc::new(Mutex::new(shipper_instance));
     let parser = Default::default(); // TODO: Replace with configurable parser, leave as is for now....
-    tracing::trace!(
+
+    tracing::debug!(
         buffer = ?buffer,
         shipper = ?shipper,
         parser = ?parser,
-        "VES log processing components initialized successfully"
+        "Core Agent data processing components initialized successfully"
     );
 
-    // Shared gRPC service state, ensuring both Local and Network modes
-    // share the same state
+    tracing::debug!(
+        "Creating shared components service, to ensure both local and over-the-network Core Agent modes share same state"
+    );
     let service = Arc::new(LogCollectorService {
         parser,
         buffer_batcher: Arc::clone(&buffer),
@@ -209,13 +197,13 @@ pub async fn run_log_collector(config_path: PathBuf) -> Result<()> {
 
     let mut task_handles: Vec<JoinHandle<()>> = Vec::new();
 
-    // Spawn local logs watcher (local-mode)
+    // Spawn local-mode observability data file watcher
     if cfg.general.enable_local_mode {
         if let Some(wcfg) = &cfg.watcher {
             if wcfg.enabled {
-                tracing::trace!(
+                tracing::info!(
                     log_dir = %wcfg.log_dir,
-                    "Starting local file watcher"
+                    "Starting local observability data file watcher"
                 );
 
                 let log_dir = PathBuf::from(&wcfg.log_dir);
@@ -223,9 +211,13 @@ pub async fn run_log_collector(config_path: PathBuf) -> Result<()> {
                 let poll_interval_ms = wcfg.poll_interval_ms;
                 let recursive = wcfg.recursive;
 
+                tracing::debug!(
+                    "Cloning Arc to shared components service, ensuring Core Agent local observability data file watcher and gRPC server maintain the same internal state"
+                );
                 // Clone the Arc so watcher shares the internal components with `network_mode_enabled`
                 let shared_service = Arc::clone(&service);
 
+                tracing::debug!("Creating global shutdown channel subscribers");
                 // Subscribe to the global shutdown channel
                 let shutdown_rx1 = shutdown.subscribe();
                 let mut shutdown_rx2 = shutdown.subscribe();
@@ -246,28 +238,31 @@ pub async fn run_log_collector(config_path: PathBuf) -> Result<()> {
                             tokio::select! {
                                 res = watcher.run_watcher(shutdown_rx1) => {
                                     if let Err(e) = res {
-                                        tracing::error!(error = %e, "Watcher error");
+                                        tracing::error!(error = %e, "Local observability data file watcher runtime error");
                                     }
                                 }
                                 _ = shutdown_rx2.recv() => {
-                                    tracing::trace!("Watcher received shutdown signal, cleaning up resources");
+                                    tracing::info!("Local observability data file watcher received shutdown signal, cleaning up resources");
                                     watcher.shutdown().await;
                                 }
                             }
                         }
+
                         Err(e) => {
-                            tracing::error!(error = %e, "Failed to start watcher");
+                            tracing::error!(error = %e, "Failed to start local observability data file watcher at runtime");
                         }
                     }
                 });
 
                 task_handles.push(handle);
             } else {
-                tracing::info!("Local log watcher disabled in [watcher] configuration");
+                tracing::info!(
+                    "Local obervability data file watcher disabled in [watcher] configuration"
+                );
             }
         } else {
             tracing::info!(
-                "No watcher configuration found in configuration file, skipping local mode."
+                "No local observability data file watcher configuration found in configuration file, skipping local mode."
             );
         }
     } else {
@@ -276,30 +271,42 @@ pub async fn run_log_collector(config_path: PathBuf) -> Result<()> {
 
     // Start gRPC server
     if cfg.general.enable_network_mode {
-        tracing::trace!(grpc_server_addr = "[::1]:50052", "Starting gRPC server");
+        tracing::info!("Starting Core Agent gRPC server");
 
+        tracing::debug!("Subscribing Core Agent gRPC server to global shutdown channel");
         // Subscribe to the global shutdown channel
         let mut shutdown_rx = shutdown.subscribe();
 
         let addr = "[::1]:50052".parse()?;
+        tracing::debug!(
+            server_addr = ?addr,
+            "Core Agent gRPC server started"
+        );
+
         let service_clone = (*service).clone();
+        tracing::debug!(
+            arc_clone = ?service_clone,
+            "Cloning Arc to shared components service, ensuring Core Agent gRPC server maintain the same internal state as local observability data file watcher"
+        );
 
         let handle = tokio::spawn(async move {
             if let Err(e) = Server::builder()
                 .add_service(LogCollectorServer::new(service_clone))
                 .serve_with_shutdown(addr, async move {
                     shutdown_rx.recv().await.ok();
-                    tracing::trace!("VES gRPC server shutting down gracefully");
+                    tracing::trace!("Core Agent gRPC server gracefully shutting down");
                 })
                 .await
             {
-                tracing::error!(error = %e, "VES gRPC server error");
+                tracing::error!(error = %e, "Core Agent gRPC server error");
             }
         });
 
         task_handles.push(handle);
     } else {
-        tracing::info!("Network mode disabled in [general] configuration");
+        tracing::info!(
+            "Network mode disabled in [general] configuration, Core Agent gRPC server not started"
+        );
     }
 
     // Record cold start duratiion in seconds
@@ -312,7 +319,9 @@ pub async fn run_log_collector(config_path: PathBuf) -> Result<()> {
 
     // Await shutdown signal
     shutdown.wait_for_shutdown().await;
-    tracing::info!("VES global shutdown triggered, awaiting log processing components to finish");
+    tracing::info!(
+        "Core Agent global shutdown triggered, awaiting data processing components to finish"
+    );
 
     // Await all task to ensure clean shutdown
     for handle in task_handles {
@@ -327,6 +336,6 @@ pub async fn run_log_collector(config_path: PathBuf) -> Result<()> {
     let mut shipper_lock = shipper.lock().await;
     shipper_lock.shutdown().await;
 
-    tracing::info!("VES successfully shut down");
+    tracing::info!("Core Agent runtime graceful shutdown successful");
     Ok(())
 }
