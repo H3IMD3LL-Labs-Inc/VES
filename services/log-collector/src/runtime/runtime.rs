@@ -247,6 +247,7 @@ pub async fn run_log_collector(config_path: PathBuf) -> Result<()> {
                                 }
                             }
                         }
+
                         Err(e) => {
                             tracing::error!(error = %e, "Failed to start local observability data file watcher at runtime");
                         }
