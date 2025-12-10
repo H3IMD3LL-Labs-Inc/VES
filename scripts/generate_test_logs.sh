@@ -2,8 +2,9 @@
 
 # -------------------- CONFIG ---------------------
 PID_FILE="/tmp/generate_test_logs.pid"
-LOG_DIR="/var/log/testlogs/actuallogs"
-GENERATOR_LOG="/var/log/testlogs/generator.log"
+LOG_DIR="$HOME/.local/state/testlogs/actuallogs"
+CORE_AGENT_CHECKPOINT_DIR="$HOME/.local/state/ves/core_agent/checkpoint.json"
+GENERATOR_LOG="$HOME/.local/state/testlogs/generator.log"
 MAX_LOG_SIZE_MB=100                  # Rotate log after this size
 MAX_JOBS=20                          # Limit concurrent background jobs
 THROUGHPUT_PER_SECOND=500000        # Base log generation rate
@@ -19,6 +20,9 @@ warn()    { echo -e "\e[33m[WARN]\e[0m $*"; }
 err()     { echo -e "\e[31m[ERROR]\e[0m $*"; }
 
 # -------------------- LOG FILES ---------------------
+mkdir -p "$LOG_DIR"
+mkdir -p "$(dirname "$GENERATOR_LOG")"
+
 CRI_LOG="$LOG_DIR/cri.log"
 DOCKER_JSON_LOG="$LOG_DIR/docker_json.log"
 ARBITRARY_JSON_LOG="$LOG_DIR/arbitrary_json.log"
