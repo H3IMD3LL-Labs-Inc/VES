@@ -25,7 +25,12 @@ struct Cli {
 enum Commands {
     /// Run log collector
     Run {
-        #[arg(short, long, default_value = "/etc/log_collector.toml")]
+        #[arg(
+            short,
+            long,
+            // This is an example to be used when building from source
+            default_value = "/home/dennis/VES/services/log-collector/src/config/log_collector.toml"
+        )]
         config: PathBuf,
     },
 
