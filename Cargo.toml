@@ -1,6 +1,6 @@
 [workspace]
 members = [
-    "services/log-collector",
+    "components/core-agent",
 ]
 
 [workspace.dependencies]
