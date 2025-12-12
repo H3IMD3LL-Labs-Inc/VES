@@ -3,6 +3,13 @@ use tokio::sync::broadcast;
 use tracing::instrument;
 
 /// Global shutdown manager, built on-top of a broadcast channel
+///
+/// Provides graceful shutdown for the following circumstances:
+/// - User interrupts process; **SIGINT(Ctrl+C)** or **SIGTERM (e.g., normal shutdown from OS)**.
+/// - Internal errors and/or fatal conditions, if a data processing pipeline in the Core Agent
+///   encounters a critical error.
+/// - Coordinated shutdown in the data processing pipeline orchestrator.
+/// - External commands or APIs sending shutdown signals to the Core Agent.
 #[derive(Debug, Clone)]
 pub struct Shutdown {
     pub tx: broadcast::Sender<()>,
