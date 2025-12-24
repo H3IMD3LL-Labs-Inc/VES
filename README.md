@@ -154,4 +154,4 @@ All contributions make VES better and help achieve the goals set out for the pro
 
 VES is free and the source is available. Currently, VES is released under the AGPL license. See individual files for details which will specify the license applicable to each file.
 
-For more information see the [VES License](license.md)
+For more information see the [VES License](license.md).
