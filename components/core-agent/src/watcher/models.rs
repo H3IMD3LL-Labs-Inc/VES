@@ -1,18 +1,38 @@
-// External crates
-use std::{
-    collections::HashMap,
-    path::PathBuf,
+// Local crates
+use crate::{
+    helpers::load_config::WatcherConfig,
 };
-use serde::{Serialize, Deserialize};
 
-/// Event translation types
+// External crates
+use std::collections::HashMap;
+use std::path::PathBuf;
+use serde::{Serialize, Deserialize};
+use tokio::sync::mpsc;
+
+/// Actual `Watcher` which is responsible for watching the data file configured in *log_dir*
+pub struct Watcher {
+    pub config: WatcherConfig,
+    pub checkpoint: Checkpoint,
+    pub output: mpsc::Sender<WatcherEvent>,
+}
+
+/// Possible translations for received `notify` events from the node(system) running
+/// the Core Agent. This allows events related to the filesystem and tied to the configured
+/// *log_dir* to be understood by the Watcher. These `WatcherEvent`s are then sent to the
+/// `TailerManager` downstream into the pipeline
 #[derive(Debug, Clone)]
 pub enum WatcherEvent {
     FileDiscovered(PathBuf),
-    FileRotated(PathBuf),
+    FileRotated {
+        old_path: PathBuf,
+        new_path: PathBuf,
+    },
     FileRemoved(PathBuf)
 }
 
+/// Current state information for the data file configured in *log_dir*, this state is needed
+/// by the `TailerManager` to determine which `WatcherEvent` is tied to which specific `Tailer`
+/// as well as allow for graceful restarts incase of crashes/restarts
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FileState {
     pub path: PathBuf,
@@ -20,6 +40,9 @@ pub struct FileState {
     pub offset: u64,
 }
 
+/// Stores the exact point in the data file configured in *log_dir* where a running `Watcher` is
+/// at. This uses FileState to determine information about the data file and gracefully restart the
+/// `Watcher`
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Checkpoint {
     // TODO: Refactor to use inode instead of PathBuf as a key
