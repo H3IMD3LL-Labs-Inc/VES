@@ -9,6 +9,9 @@ use std::path::PathBuf;
 use serde::{Serialize, Deserialize};
 use tokio::sync::mpsc;
 
+/// File inode type-aliasing
+pub type Inode = u64;
+
 /// Actual `Watcher` which is responsible for watching the data file configured in *log_dir*
 pub struct Watcher {
     pub config: WatcherConfig,
@@ -36,7 +39,7 @@ pub enum WatcherEvent {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FileState {
     pub path: PathBuf,
-    pub inode: u64,
+    pub inode: Inode,
     pub offset: u64,
 }
 
@@ -45,6 +48,14 @@ pub struct FileState {
 /// `Watcher`
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Checkpoint {
-    // TODO: Refactor to use inode instead of PathBuf as a key
-    pub files: HashMap<PathBuf, FileState>,
+    pub files: HashMap<Inode, FileState>,
+}
+
+/// Payload containing the `WatcherEvent` and `FileState` for the data file configured in *log_dir*.
+/// This payload allows the `TailerManager` to identify the specific `Tailer` tied to the configured
+/// data file.
+pub struct WatcherPayload {
+    pub inode: u64,
+    pub path: PathBuf,
+    pub event: WatcherEvent,
 }
