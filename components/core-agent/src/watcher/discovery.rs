@@ -2,7 +2,7 @@
 use crate::{
     helpers::load_config::WatcherConfig,
     watcher::{
-        models::{Checkpoint, WatcherEvent},
+        models::{Checkpoint, WatcherEvent, WatcherPayload},
         state::determine_file_state,
     }
 };
@@ -11,7 +11,7 @@ use crate::{
 use std::path::Path;
 use walkdir::WalkDir;
 use tokio::sync::mpsc;
-use tracing::{info, warn};
+use tracing::info;
 use anyhow::Result;
 
 /// Discover initial data files in configured *log_dir* to bootstrap
@@ -19,7 +19,7 @@ use anyhow::Result;
 pub async fn discover_initial_files(
     config: &WatcherConfig,
     checkpoint: &mut Checkpoint,
-    output: &mpsc::Sender<WatcherEvent>
+    output: &mpsc::Sender<WatcherPayload>
 ) -> Result<()> {
     for entry in build_walker(config).into_iter().filter_map(Result::ok) {
         let path = entry.path().to_path_buf();
@@ -28,34 +28,33 @@ pub async fn discover_initial_files(
             continue;
         }
 
-        let current_state = determine_file_state(path.clone()).await;
+        let state = determine_file_state(path.clone()).await;
+        let inode = state.inode;
 
-        match checkpoint.files.get(&path) {
-            Some(existing) if existing.inode == current_state.inode => {
-                // Same file determined
-                info!(
-                    file = %path.display(),
-                    offset = existing.offset,
-                    "Restoring file from Checkpoint"
-                );
-            }
-            Some(_) => {
-                // Inode change determined
-                warn!(
-                    file = %path.display(),
-                    "File inode changed, treating as new file"
-                );
-                checkpoint.files.insert(path.clone(), current_state);
-            }
-            None => {
-                // New file determined
-                checkpoint.files.insert(path.clone(), current_state);
-            }
+        if let Some(existing) = checkpoint.files.get(&inode) {
+            info!(
+                file = %path.display(),
+                offset = existing.offset,
+                "Restoring file from Checkpoint"
+            );
+            continue;
         }
 
-        output
-            .send(WatcherEvent::FileDiscovered(path))
-            .await?;
+        info!(
+            file = %path.display(),
+            inode = inode,
+            "Discovered new data file at startup"
+        );
+
+        checkpoint.files.insert(inode, state);
+
+        let payload = WatcherPayload {
+            inode,
+            path: path.clone(),
+            event: WatcherEvent::FileDiscovered { inode, path },
+        };
+
+        output.send(payload).await?;
     }
 
     Ok(())
@@ -65,11 +64,11 @@ pub async fn discover_initial_files(
 /// new files when a Watcher is running.
 ///
 /// This is intended to handle edge cases where [**notify**](https://docs.rs/notify/latest/notify/index.html) misses filesystem
-/// events.
+/// events and when new data files are discovered.
 pub async fn discover_new_files(
     config: &WatcherConfig,
     checkpoint: &mut Checkpoint,
-    output: &mpsc::Sender<WatcherEvent>
+    output: &mpsc::Sender<WatcherPayload>
 ) -> Result<()> {
     for entry in build_walker(config).into_iter().filter_map(Result::ok) {
         let path = entry.path().to_path_buf();
@@ -78,18 +77,28 @@ pub async fn discover_new_files(
             continue;
         }
 
-        if checkpoint.files.contains_key(&path) {
+        let state = determine_file_state(path.clone()).await;
+        let inode = state.inode;
+
+        if checkpoint.files.contains_key(&inode) {
             continue;
         }
 
-        let file_state = determine_file_state(path.clone()).await;
-        checkpoint.files.insert(path.clone(), file_state);
+        info!(
+            file = %path.display(),
+            inode = inode,
+            "Discovered new data file during runtime scan, added to Checkpoint"
+        );
 
-        output
-            .send(WatcherEvent::FileDiscovered(path))
-            .await?;
+        checkpoint.files.insert(inode, state);
 
-        info!("Discovered new data file during runtime scan, added to Checkpoint");
+        let payload = WatcherPayload {
+            inode,
+            path: path.clone(),
+            event: WatcherEvent::FileDiscovered { inode, path },
+        };
+
+        output.send(payload).await?;
     }
 
     Ok(())

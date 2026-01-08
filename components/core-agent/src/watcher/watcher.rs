@@ -2,35 +2,88 @@
 use crate::{
     helpers::load_config::WatcherConfig,
     watcher::{
-        models::{WatcherEvent, Checkpoint},
+        models::{Watcher, WatcherEvent, WatcherPayload, FileState, Checkpoint},
         discovery::*,
         events::*},
 };
 
 // External crates
 use std::path::Path;
+use std::path::PathBuf;
 use anyhow::Result;
 use notify::{Event, RecommendedWatcher, RecursiveMode, Watcher as NotifyWatcher};
 use tokio::{sync::{broadcast, mpsc}, time::{interval, Duration}};
 use tokio_util::sync::CancellationToken;
-use tracing::{info, instrument};
-
-pub struct Watcher {
-    config: WatcherConfig,
-    checkpoint: Checkpoint,
-    output: mpsc::Sender<WatcherEvent>,
-}
+use tracing::{info, warn, instrument};
 
 impl Watcher {
     pub fn new(
         config: WatcherConfig,
         checkpoint: Checkpoint,
-        output: mpsc::Sender<WatcherEvent>,
+        output: mpsc::Sender<WatcherPayload>,
     ) -> Self {
+        info!("Created new Watcher");
+
         Self {
             config,
             checkpoint,
             output
+        }
+    }
+
+    fn build_payload(&mut self, event: WatcherEvent) -> Option<WatcherPayload> {
+        match &event {
+            WatcherEvent::FileDiscovered { inode, path } => {
+                // Insert the data file into Checkpoint
+                self.checkpoint.files.insert(
+                    *inode,
+                    FileState {
+                        inode: *inode,
+                        path: path.clone(),
+                        offset: 0,
+                    },
+                );
+
+                Some(WatcherPayload {
+                    inode: *inode,
+                    path: path.clone(),
+                    event,
+                })
+            }
+
+            WatcherEvent::FileRotated {
+                old_inode,
+                new_inode,
+                new_path,
+                ..
+            } => {
+                // Update Checkpoint atomically on file rotation
+                self.checkpoint.files.remove(old_inode);
+                self.checkpoint.files.insert(
+                    *new_inode,
+                    FileState {
+                        inode: *new_inode,
+                        path: new_path.clone(),
+                        offset: 0,
+                    },
+                );
+
+                Some(WatcherPayload {
+                    inode: *new_inode,
+                    path: new_path.clone(),
+                    event,
+                })
+            }
+
+            WatcherEvent::FileRemoved { inode, .. } => {
+                self.checkpoint.files.remove(inode);
+
+                Some(WatcherPayload {
+                    inode: *inode,
+                    path: PathBuf::new(),
+                    event,
+                })
+            }
         }
     }
 
@@ -99,11 +152,15 @@ impl Watcher {
                 }
 
                 Some(event) = fs_rx.recv() => {
-                    // translate FileSystem events to WatcherEvents and emit them to
-                    // Tailers using watcher_tx
                     let events = translate_event(event);
+
                     for event in events {
-                        let _ = self.output.send(event).await;
+                        if let Some(payload) = self.build_payload(event) {
+                            if let Err(e) = self.output.send(payload).await {
+                                warn!(error=?e, "Failed sending WatcherPayload");
+                                break;
+                            }
+                        }
                     }
                 }
             }

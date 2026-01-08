@@ -16,7 +16,7 @@ pub type Inode = u64;
 pub struct Watcher {
     pub config: WatcherConfig,
     pub checkpoint: Checkpoint,
-    pub output: mpsc::Sender<WatcherEvent>,
+    pub output: mpsc::Sender<WatcherPayload>,
 }
 
 /// Possible translations for received `notify` events from the node(system) running
@@ -25,12 +25,20 @@ pub struct Watcher {
 /// `TailerManager` downstream into the pipeline
 #[derive(Debug, Clone)]
 pub enum WatcherEvent {
-    FileDiscovered(PathBuf),
+    FileDiscovered {
+        inode: Inode,
+        path: PathBuf,
+    },
     FileRotated {
+        old_inode: Inode,
+        new_inode: Inode,
         old_path: PathBuf,
         new_path: PathBuf,
     },
-    FileRemoved(PathBuf)
+    FileRemoved {
+        inode: Inode,
+        path: PathBuf,
+    }
 }
 
 /// Current state information for the data file configured in *log_dir*, this state is needed
