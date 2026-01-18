@@ -34,7 +34,7 @@
 </p>
 
 <p align="center">
-    <a href="https://ves.heimdelllabs.cloud/documentation/ves-v0.1.0/intro"><strong>Docs</strong></a> - <a href="https://discord.gg/"><strong>Discord</strong></a> - <a href="https://x.com/heimdell_labs"><strong>X/Twitter</strong></a> - <a href="https://ves.heimdelllabs.cloud/documentation/coming-soon/overview"><strong>Roadmap</strong></a> - <a href="https://ves.heimdelllabs.cloud/documentation/ves-v0.1.0/ves"><strong>Why VES?</strong><a/> - <a href="https://ves.heimdelllabs.cloud/documentation/coming-soon/overview"><strong>Changelog</strong></a>
+    <a href="https://ves.heimdelllabs.cloud/"><strong>Docs</strong></a> - <a href="https://x.com/heimdell_labs"><strong>X/Twitter</strong></a> - <a href="https://ves.heimdelllabs.cloud/documentation/coming-soon/overview"><strong>Roadmap</strong></a> - <a href="https://ves.heimdelllabs.cloud/documentation/ves-v0.1.0/ves"><strong>Why VES?</strong><a/> - <a href="https://ves.heimdelllabs.cloud/documentation/coming-soon/overview"><strong>Changelog</strong></a>
 </p>
 
 <p align="center">
@@ -154,4 +154,4 @@ All contributions make VES better and help achieve the goals set out for the pro
 
 VES is free and the source is available. Currently, VES is released under the AGPL license. See individual files for details which will specify the license applicable to each file.
 
-For more information see the [VES License](license.md)
+For more information see the [VES License](license.md).
