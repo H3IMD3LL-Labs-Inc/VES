@@ -1,16 +1,18 @@
 // Local crates
 use crate::{
-    buffer_batcher::log_buffer_batcher::InMemoryBuffer, helpers::{load_config::Config, shutdown::Shutdown}, proto::collector::log_collector_server::LogCollectorServer, server::server::LogCollectorService, shipper::shipper::Shipper, tailer::tailer::Tailer, watcher::watcher::LogWatcher
+    buffer_batcher::log_buffer_batcher::InMemoryBuffer,
+    helpers::{load_config::Config, shutdown::Shutdown},
+    parser::parser::NormalizedLog,
+    shipper::shipper::Shipper,
+    tailer::tailer::Tailer, watcher::watcher::Watcher
 };
 
 // External crates
 use anyhow::Result;
 use std::path::PathBuf;
-use std::sync::Arc;
-use tokio::{signal, sync::{Mutex, mpsc}, task::JoinHandle};
+use tokio::{signal, sync::mpsc, task::JoinHandle};
 use tokio_util::sync::CancellationToken;
-use tonic::transport::Server;
-use tracing::{info, debug, error, instrument};
+use tracing::{info, instrument};
 
 /// Core Agent runtime initialization and setup.
 #[instrument(
@@ -28,8 +30,8 @@ pub async fn run_log_collector(config_path: PathBuf) -> Result<()> {
     let shutdown_signal = shutdown.clone();
 
     // Initialize CancellationToken
-    let cancel_token = CancellationToken::new();
-    info!("Created task CancellationToken");
+    let global_cancel = CancellationToken::new();
+    info!("Created global CancellationToken");
 
     // Load Core Agent configurations
     info!(
@@ -50,9 +52,9 @@ pub async fn run_log_collector(config_path: PathBuf) -> Result<()> {
     info!("Created pipeline channels...");
 
     // Pipeline component instantiation
-    let watcher = LogWatcher::new_watcher(cfg.clone(), watcher_tx);
-    let tailer = Tailer::new_tailer(tailer_rx, tailer_tx);
-    let parser = Parser::new(parser_rx, parser_tx);
+    let watcher = Watcher::new(cfg.clone(), watcher_tx);
+    let tailer = Tailer::new(tailer_rx, tailer_tx);
+    let parser = NormalizedLog::new(parser_rx, parser_tx);
     let buffer_batcher = InMemoryBuffer::new(buffer_batcher_rx, buffer_batcher_tx);
     let shipper = Shipper::new(shipper_rx, cfg.clone());
     info!("Initialized pipeline components...");
@@ -63,12 +65,12 @@ pub async fn run_log_collector(config_path: PathBuf) -> Result<()> {
     tasks.push(tokio::spawn({
         let s = shutdown.subscribe();
         let c = cancel_token.child_token();
-        async move { watcher.run_watcher(s, c).await }
+        async move { watcher.run(s, c).await }
     }));
     tasks.push(tokio::spawn({
         let s = shutdown.subscribe();
         let c = cancel_token.child_token();
-        async move { tailer.run_tailer(s, c).await }
+        async move { tailer.run(s, c).await }
     }));
     tasks.push(tokio::spawn({
         let s = shutdown.subscribe();
@@ -91,7 +93,7 @@ pub async fn run_log_collector(config_path: PathBuf) -> Result<()> {
        let cancel_token = cancel_token.clone();
        async move {
            // Wait for a signal
-           let _ = tokio::signal::ctrl_c()
+           let _ = signal::ctrl_c()
                .await
                .expect("Failed to listen for CTRL+C");
            info!("CTRL+C received..triggering shutdown...");

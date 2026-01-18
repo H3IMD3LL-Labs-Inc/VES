@@ -39,6 +39,7 @@ futures.workspace = true
 prost-types.workspace = true
 hdrhistogram.workspace = true
 sysinfo.workspace = true
+walkdir.workspace = true
 
 [build-dependencies]
 tonic-prost-build = "0.14.2"

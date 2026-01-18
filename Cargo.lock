@@ -437,6 +437,7 @@ dependencies = [
  "tracing-appender",
  "tracing-error",
  "tracing-subscriber",
+ "walkdir",
 ]
 
 [[package]]
