@@ -73,16 +73,8 @@ pub struct Tailer {
 /// piece of data read from a file. It is not bytes, not lines necessarily, and not
 /// file metadata.
 pub struct TailerPayload {
-
-    /// file source for this data
     pub inode: Inode,
-
-    /// Byte offset where data starts
     pub offset: u64,
-
-    /// Actual raw data in `Payload`
     pub raw_data: Bytes,
-
-    /// Raw data size in `Payload`
     pub size: usize,
 }
