@@ -62,6 +62,7 @@ pub struct Checkpoint {
 /// Payload containing the `WatcherEvent` and `FileState` for the data file configured in *log_dir*.
 /// This payload allows the `TailerManager` to identify the specific `Tailer` tied to the configured
 /// data file.
+#[derive(Clone)]
 pub struct WatcherPayload {
     pub inode: u64,
     pub path: PathBuf,
