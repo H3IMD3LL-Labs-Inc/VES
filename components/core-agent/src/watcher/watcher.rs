@@ -2,9 +2,16 @@
 use crate::{
     helpers::load_config::WatcherConfig,
     watcher::{
-        models::{Watcher, WatcherEvent, WatcherPayload, FileState, Checkpoint},
+        models::{
+            Watcher,
+            WatcherEvent,
+            WatcherPayload,
+            FileState,
+            Checkpoint
+        },
         discovery::*,
-        events::*},
+        events::*
+    },
 };
 
 // External crates
@@ -14,7 +21,6 @@ use anyhow::Result;
 use notify::{Event, RecommendedWatcher, RecursiveMode, Watcher as NotifyWatcher};
 use tokio::{sync::{broadcast, mpsc}, time::{interval, Duration}};
 use tokio_util::sync::CancellationToken;
-use tracing::{info, warn, instrument};
 
 impl Watcher {
     pub fn new(
@@ -22,7 +28,6 @@ impl Watcher {
         checkpoint: Checkpoint,
         output: mpsc::Sender<WatcherPayload>,
     ) -> Self {
-        info!("Created new Watcher");
 
         Self {
             config,
@@ -88,14 +93,11 @@ impl Watcher {
     }
 
     // running Watcher loop
-    #[instrument(name = "pipeline::watcher::run", skip_all, level = "debug")]
     pub async fn run(
         mut self,
         mut shutdown_rx: broadcast::Receiver<()>,
         cancel: CancellationToken,
     ) -> Result<()> {
-        info!("Starting Watcher");
-
         // channel to notify Watcher of FileSystem events
         let (fs_tx, mut fs_rx) = mpsc::channel::<Event>(128);
 
@@ -133,12 +135,10 @@ impl Watcher {
         loop {
             tokio::select! {
                 _ = cancel.cancelled() => {
-                    info!("Running Watcher task cancelled");
                     break;
                 },
 
                 Ok(_) = shutdown_rx.recv() => {
-                    info!("Running Watcher received Shutdown broadcast");
                     break;
                 },
 
@@ -157,7 +157,6 @@ impl Watcher {
                     for event in events {
                         if let Some(payload) = self.build_payload(event) {
                             if let Err(e) = self.output.send(payload).await {
-                                warn!(error=?e, "Failed sending WatcherPayload");
                                 break;
                             }
                         }
@@ -166,7 +165,6 @@ impl Watcher {
             }
         }
 
-        info!("Running Watcher exited cleanly");
         Ok(())
     }
 }
