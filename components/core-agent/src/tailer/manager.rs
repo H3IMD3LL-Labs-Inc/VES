@@ -1,9 +1,9 @@
 // Local crates
 use crate::tailer::{
     models::TailerManager,
-    tailer_events::{translate_event, handle_event},
+    tailer_events::{handle_event, translate_event},
 };
-use crate::watcher::models::{WatcherPayload, Checkpoint};
+use crate::watcher::models::{Checkpoint, WatcherPayload};
 
 // External crates
 use anyhow::Result;
@@ -12,14 +12,13 @@ use tokio::sync::broadcast;
 use tokio_util::sync::CancellationToken;
 
 impl TailerManager {
-
     /// Create a new `TailerManager` once when the pipeline starts for the first
     /// time or restarts
     pub fn new(
-      watcher_rx: broadcast::Receiver<WatcherPayload>,
-      shutdown_rx: broadcast::Receiver<()>,
-      checkpoint: Checkpoint,
-      parent_cancel: CancellationToken,
+        watcher_rx: broadcast::Receiver<WatcherPayload>,
+        shutdown_rx: broadcast::Receiver<()>,
+        checkpoint: Checkpoint,
+        parent_cancel: CancellationToken,
     ) -> Self {
         let cancel = parent_cancel.child_token();
 
@@ -34,7 +33,7 @@ impl TailerManager {
 
     /// Continuously receive `WatcherEvent`s from the Watcher and manage the pipeline's
     /// `Tailer`s based on them. This is the main orchestration loop for all Tailers
-    #[allow(unused_doc_comments)]
+    #[allow(unused_doc_comments)] // [TODO]: Remove this later...
     pub async fn run(mut self) -> Result<()> {
         loop {
             tokio::select! {
