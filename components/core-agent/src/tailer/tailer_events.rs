@@ -1,27 +1,53 @@
 // Local crates
 use crate::{
     tailer::models::TailerEvent,
-    watcher::models::WatcherEvent
+    watcher::models::{
+        WatcherPayload,
+        WatcherEvent
+    },
 };
 
-// External crates
-use std::iter;
-
-/// Translate `WatcherEvent`s received by the `TailerManager`  to `TailerEvent`s,
-/// which the TailerManager understands internally
-pub fn translate_to_tailer_event(
-    event: WatcherEvent
+/// TASKS:
+/// - This function should take WatcherPayload as input
+/// - Use the WatcherPayload to extract the necessary information needed to translation
+/// - Return a TailerEvent based on the extracted information
+pub fn translate_event(
+    payload: WatcherPayload
 ) -> impl IntoIterator<Item = TailerEvent> {
 
-    match event {
-        WatcherEvent::FileDiscovered(_) => {
-            vec![TailerEvent::Start]
+    match payload.event {
+        WatcherEvent::FileDiscovered { inode, path } => {
+            vec![TailerEvent::Start { inode, path }]
         }
-        WatcherEvent::FileRotated { .. } => {
-            vec![TailerEvent::Stop, TailerEvent::Start]
+
+        WatcherEvent::FileRotated {
+            old_inode,
+            new_inode,
+            old_path,
+            new_path,
+        } => {
+            vec![
+                TailerEvent::Stop { inode: old_inode, path: old_path },
+                TailerEvent::Start {
+                    inode: new_inode,
+                    path: new_path,
+                }
+            ]
         }
-        WatcherEvent::FileRemoved(_) => {
-            vec![TailerEvent::Stop]
+
+        WatcherEvent::FileRemoved { inode, path } => {
+            vec![TailerEvent::Stop { inode, path }]
         }
     }
+}
+
+/// Handle `TailerEvent`s for a specific `Tailer`. This allows the `TailerManager` to
+/// start, stop or manage(determine) appropriate actions a Tailer should take, based on
+/// the Tailer's `TailerEvent`s
+pub async fn handle_event(event: TailerEvent) {
+    // [TODO]: Determine the specific Tailer a TailerEvent belongs to
+
+    // [TODO]: Take the necessary action based on the TailerEvent(Start, Stop & Stop->Start)
+
+    // [TODO]: Give tracing info for the specific Tailer action taken
 }
