@@ -2,24 +2,21 @@
 use crate::{
     helpers::load_config::WatcherConfig,
     watcher::{
-        models::{
-            Watcher,
-            WatcherEvent,
-            WatcherPayload,
-            FileState,
-            Checkpoint
-        },
         discovery::*,
-        events::*
+        events::*,
+        models::{Checkpoint, FileState, Watcher, WatcherEvent, WatcherPayload},
     },
 };
 
 // External crates
-use std::path::Path;
-use std::path::PathBuf;
 use anyhow::Result;
 use notify::{Event, RecommendedWatcher, RecursiveMode, Watcher as NotifyWatcher};
-use tokio::{sync::{broadcast, mpsc}, time::{interval, Duration}};
+use std::path::Path;
+use std::path::PathBuf;
+use tokio::{
+    sync::{broadcast, mpsc},
+    time::{Duration, interval},
+};
 use tokio_util::sync::CancellationToken;
 
 impl Watcher {
@@ -28,11 +25,10 @@ impl Watcher {
         checkpoint: Checkpoint,
         output: mpsc::Sender<WatcherPayload>,
     ) -> Self {
-
         Self {
             config,
             checkpoint,
-            output
+            output,
         }
     }
 
@@ -123,11 +119,7 @@ impl Watcher {
         )?;
 
         // bootstrapping initial data files
-        discover_initial_files(
-            &self.config,
-            &mut self.checkpoint,
-            &self.output,
-        ).await?;
+        discover_initial_files(&self.config, &mut self.checkpoint, &self.output).await?;
 
         let mut ticker = interval(Duration::from_secs(5));
 
