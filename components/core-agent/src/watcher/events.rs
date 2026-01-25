@@ -1,20 +1,14 @@
 // Local crates
-use crate::{
-    watcher::models::WatcherEvent,
-};
+use crate::watcher::models::WatcherEvent;
 
 // External crates
-use std::fs;
-use std::path::Path;
-use std::os::unix::fs::MetadataExt;
 use notify::{
-    Event,
-    EventKind,
-    event::{
-        CreateKind, ModifyKind, RemoveKind, RenameMode
-    },
+    Event, EventKind,
+    event::{CreateKind, ModifyKind, RemoveKind, RenameMode},
 };
-use tracing::{info, warn};
+use std::fs;
+use std::os::unix::fs::MetadataExt;
+use std::path::Path;
 
 fn inode_for(path: &Path) -> Option<u64> {
     fs::metadata(path).ok().map(|m| m.ino())
@@ -26,15 +20,9 @@ pub fn translate_event(event: Event) -> Vec<WatcherEvent> {
 
     match event.kind {
         EventKind::Create(CreateKind::File) => {
-            info!("File created event");
             for path in event.paths {
-                info!(?path, "New file created in the filesystem");
                 if let Some(inode) = inode_for(&path) {
-                    info!(?path, "New file created in the filesystem");
-                    out.push(WatcherEvent::FileDiscovered {
-                        inode,
-                        path
-                    });
+                    out.push(WatcherEvent::FileDiscovered { inode, path });
                 }
             }
         }
@@ -48,7 +36,6 @@ pub fn translate_event(event: Event) -> Vec<WatcherEvent> {
                 let new_inode = inode_for(&new_path);
 
                 if let (Some(old_inode), Some(new_inode)) = (old_inode, new_inode) {
-                    info!("File rotated in the filesystem");
                     out.push(WatcherEvent::FileRotated {
                         old_inode,
                         new_inode,
@@ -64,16 +51,13 @@ pub fn translate_event(event: Event) -> Vec<WatcherEvent> {
                 // inode may no longer exist, best effort lookup sometimes
                 // metadata still works if file is unlinked but open
                 if let Some(inode) = inode_for(&path) {
-                    out.push(WatcherEvent::FileRemoved {
-                       inode,
-                       path
-                    });
+                    out.push(WatcherEvent::FileRemoved { inode, path });
                 }
             }
         }
 
         other => {
-            warn!(?other, "Unfamiliar filesystem event occurred");
+            // [TODO]: Implement warn!() tracing here
         }
     }
 
