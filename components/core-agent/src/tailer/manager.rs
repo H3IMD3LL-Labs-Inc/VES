@@ -33,7 +33,6 @@ impl TailerManager {
 
     /// Continuously receive `WatcherEvent`s from the Watcher and manage the pipeline's
     /// `Tailer`s based on them. This is the main orchestration loop for all Tailers
-    #[allow(unused_doc_comments)] // [TODO]: Remove this later...
     pub async fn run(mut self) -> Result<()> {
         loop {
             tokio::select! {
@@ -46,8 +45,6 @@ impl TailerManager {
                 },
 
                 Ok(event) = self.watcher_rx.recv() => {
-                    /// [TODO]: Change translate_event() to extract information from
-                    /// WatcherPayload and transform the WatcherEvent to a TailerEvent
                     let tailer_events = translate_event(event);
 
                     for event in tailer_events {

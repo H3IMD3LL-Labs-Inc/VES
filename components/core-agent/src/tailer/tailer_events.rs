@@ -7,10 +7,6 @@ use crate::{
     },
 };
 
-/// TASKS:
-/// - This function should take WatcherPayload as input
-/// - Use the WatcherPayload to extract the necessary information needed to translation
-/// - Return a TailerEvent based on the extracted information
 pub fn translate_event(
     payload: WatcherPayload
 ) -> impl IntoIterator<Item = TailerEvent> {
