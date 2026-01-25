@@ -1,14 +1,14 @@
 // Local crates
-use crate::watcher::models::{WatcherPayload, Checkpoint};
+use crate::watcher::models::{Checkpoint, WatcherPayload};
 
 // External crates
 use anyhow::Result;
-use std::path::PathBuf;
+use bytes::Bytes;
 use std::collections::HashMap;
+use std::path::PathBuf;
 use tokio::sync::{broadcast, mpsc};
 use tokio::task::JoinHandle;
 use tokio_util::sync::CancellationToken;
-use bytes::Bytes;
 
 /// File inode type-aliasing
 pub type Inode = u64;
@@ -31,14 +31,14 @@ pub struct TailerManager {
     pub shutdown_rx: broadcast::Receiver<()>,
     pub cancel: CancellationToken,
     pub tailers: HashMap<Inode, TailerHandle>,
-    pub checkpoint: Checkpoint
+    pub checkpoint: Checkpoint,
 }
 
 /// Control plane object that represents an individual running `Tailer` task. Allows `TailerManager`
 /// to have control over an individual Tailer.
 struct TailerHandle {
     join: JoinHandle<Result<()>>,
-    cancel: CancellationToken
+    cancel: CancellationToken,
 }
 
 /// Control plane translations for possible received `WatcherEvent`s. These allow the
@@ -50,6 +50,7 @@ pub enum TailerEvent {
     },
     Stop {
         inode: Inode,
+        path: PathBuf,
     },
     Rotate {
         old_inode: Inode,
