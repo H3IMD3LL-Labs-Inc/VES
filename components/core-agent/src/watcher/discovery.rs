@@ -4,22 +4,21 @@ use crate::{
     watcher::{
         models::{Checkpoint, WatcherEvent, WatcherPayload},
         state::determine_file_state,
-    }
+    },
 };
 
 // External crates
-use std::path::Path;
-use walkdir::WalkDir;
-use tokio::sync::mpsc;
-use tracing::info;
 use anyhow::Result;
+use std::path::Path;
+use tokio::sync::mpsc;
+use walkdir::WalkDir;
 
 /// Discover initial data files in configured *log_dir* to bootstrap
 /// a running Watcher
 pub async fn discover_initial_files(
     config: &WatcherConfig,
     checkpoint: &mut Checkpoint,
-    output: &mpsc::Sender<WatcherPayload>
+    output: &mpsc::Sender<WatcherPayload>,
 ) -> Result<()> {
     for entry in build_walker(config).into_iter().filter_map(Result::ok) {
         let path = entry.path().to_path_buf();
@@ -32,19 +31,8 @@ pub async fn discover_initial_files(
         let inode = state.inode;
 
         if let Some(existing) = checkpoint.files.get(&inode) {
-            info!(
-                file = %path.display(),
-                offset = existing.offset,
-                "Restoring file from Checkpoint"
-            );
             continue;
         }
-
-        info!(
-            file = %path.display(),
-            inode = inode,
-            "Discovered new data file at startup"
-        );
 
         checkpoint.files.insert(inode, state);
 
@@ -68,7 +56,7 @@ pub async fn discover_initial_files(
 pub async fn discover_new_files(
     config: &WatcherConfig,
     checkpoint: &mut Checkpoint,
-    output: &mpsc::Sender<WatcherPayload>
+    output: &mpsc::Sender<WatcherPayload>,
 ) -> Result<()> {
     for entry in build_walker(config).into_iter().filter_map(Result::ok) {
         let path = entry.path().to_path_buf();
@@ -83,12 +71,6 @@ pub async fn discover_new_files(
         if checkpoint.files.contains_key(&inode) {
             continue;
         }
-
-        info!(
-            file = %path.display(),
-            inode = inode,
-            "Discovered new data file during runtime scan, added to Checkpoint"
-        );
 
         checkpoint.files.insert(inode, state);
 
@@ -110,9 +92,7 @@ fn build_walker(config: &WatcherConfig) -> WalkDir {
         .same_file_system(true);
 
     if !config.recursive.unwrap_or(true) {
-        filesystem_walker = filesystem_walker
-            .min_depth(0)
-            .max_depth(1)
+        filesystem_walker = filesystem_walker.min_depth(0).max_depth(1)
     }
 
     filesystem_walker
