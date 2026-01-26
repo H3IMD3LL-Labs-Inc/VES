@@ -44,8 +44,8 @@ impl TailerManager {
                     break;
                 },
 
-                Ok(event) = self.watcher_rx.recv() => {
-                    let tailer_events = translate_event(event);
+                Ok(payload) = self.watcher_rx.recv() => {
+                    let tailer_events = translate_event(payload);
 
                     for event in tailer_events {
                         handle_event(event).await;
