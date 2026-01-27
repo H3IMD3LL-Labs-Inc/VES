@@ -75,5 +75,5 @@ pub fn stop_tailer(
     path: PathBuf,
     tailers: &mut HashMap<Inode, TailerHandle>,
 ) {
-    // [TODO]: Gracefully Shutdown a running Tailer
+    // [TODO]: Gracefully Shutdown & stop a running Tailer
 }
