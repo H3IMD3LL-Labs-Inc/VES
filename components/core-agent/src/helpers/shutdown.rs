@@ -47,7 +47,9 @@ impl Shutdown {
         level = "debug"
     )]
     pub fn trigger(&self) {
-        tracing::info!("Shutdown triggered, notify created global shutdown broadcast channel Sender subscribers");
+        tracing::info!(
+            "Shutdown triggered, notify created global shutdown broadcast channel Sender subscribers"
+        );
         let _ = self.tx.send(());
     }
 

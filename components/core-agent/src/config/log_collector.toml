@@ -10,6 +10,8 @@ pod_log_dir = "/var/log/pods"
 poll_interval_ms = 5000
 recursive = false
 
+[tailer]
+
 [parser]
 
 [buffer]
