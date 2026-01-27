@@ -23,6 +23,7 @@ impl TailerManager {
         checkpoint: Checkpoint,
         parent_cancel: CancellationToken,
     ) -> Self {
+        // [TODO]: Fix CancellationToken handling Root -> TailerManager -> Tailers
         let cancel = parent_cancel.child_token();
 
         // [TODO]: Use output_rx in the next stage of the normalization stage
