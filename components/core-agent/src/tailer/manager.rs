@@ -1,6 +1,9 @@
 // Local crates
 use crate::tailer::{
-    models::TailerManager,
+    models::{
+        TailerManager,
+        TailerPayload,
+    },
     tailer_events::{handle_event, translate_event},
 };
 use crate::watcher::models::{Checkpoint, WatcherPayload};
@@ -8,7 +11,7 @@ use crate::watcher::models::{Checkpoint, WatcherPayload};
 // External crates
 use anyhow::Result;
 use std::collections::HashMap;
-use tokio::sync::broadcast;
+use tokio::sync::{mpsc, broadcast};
 use tokio_util::sync::CancellationToken;
 
 impl TailerManager {
@@ -22,12 +25,17 @@ impl TailerManager {
     ) -> Self {
         let cancel = parent_cancel.child_token();
 
+        // [TODO]: Use output_rx in the next stage of the normalization stage
+        // of the pipeline to receive TailerPayloads
+        let (output_tx, output_rx) = mpsc::channel::<TailerPayload>(1024);
+
         Self {
             watcher_rx,
             shutdown_rx,
             cancel,
             tailers: HashMap::new(),
             checkpoint,
+            output: output_tx,
         }
     }
 
@@ -46,7 +54,7 @@ impl TailerManager {
 
                 Ok(payload) = self.watcher_rx.recv() => {
                     for event in translate_event(payload) {
-                        handle_event(event).await;
+                        handle_event(event, &mut self.tailers, self.output.clone()).await;
                     }
                 }
             }

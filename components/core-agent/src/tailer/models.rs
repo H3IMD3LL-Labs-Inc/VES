@@ -32,13 +32,14 @@ pub struct TailerManager {
     pub cancel: CancellationToken,
     pub tailers: HashMap<Inode, TailerHandle>,
     pub checkpoint: Checkpoint,
+    pub output: mpsc::Sender<TailerPayload>,
 }
 
 /// Control plane object that represents an individual running `Tailer` task. Allows `TailerManager`
 /// to have control over an individual Tailer.
-struct TailerHandle {
-    join: JoinHandle<Result<()>>,
-    cancel: CancellationToken,
+pub struct TailerHandle {
+    pub join: JoinHandle<Result<()>>,
+    pub cancel: CancellationToken,
 }
 
 /// Control plane translations for possible received `WatcherEvent`s. These allow the
