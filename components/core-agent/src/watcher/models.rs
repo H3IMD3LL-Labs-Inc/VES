@@ -1,12 +1,10 @@
 // Local crates
-use crate::{
-    helpers::load_config::WatcherConfig,
-};
+use crate::helpers::load_config::WatcherConfig;
 
 // External crates
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::PathBuf;
-use serde::{Serialize, Deserialize};
 use tokio::sync::mpsc;
 
 /// File inode type-aliasing
@@ -38,7 +36,7 @@ pub enum WatcherEvent {
     FileRemoved {
         inode: Inode,
         path: PathBuf,
-    }
+    },
 }
 
 /// Current state information for the data file configured in *log_dir*, this state is needed
@@ -62,6 +60,7 @@ pub struct Checkpoint {
 /// Payload containing the `WatcherEvent` and `FileState` for the data file configured in *log_dir*.
 /// This payload allows the `TailerManager` to identify the specific `Tailer` tied to the configured
 /// data file.
+#[derive(Clone)]
 pub struct WatcherPayload {
     pub inode: u64,
     pub path: PathBuf,
