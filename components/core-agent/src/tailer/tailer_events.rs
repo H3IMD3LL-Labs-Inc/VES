@@ -1,11 +1,26 @@
 // Local crates
 use crate::{
-    tailer::models::TailerEvent,
+    tailer::{
+        tailer::{
+            start_tailer,
+            stop_tailer,
+        },
+        models::{
+            Inode,
+            TailerHandle,
+            TailerEvent,
+            TailerPayload,
+        },
+    },
     watcher::models::{
         WatcherPayload,
         WatcherEvent
     },
 };
+
+// External crates
+use std::collections::HashMap;
+use tokio::sync::mpsc;
 
 pub fn translate_event(
     payload: WatcherPayload
@@ -39,35 +54,18 @@ pub fn translate_event(
 
 pub async fn handle_event(
     event: TailerEvent,
+    tailers: &mut HashMap<Inode, TailerHandle>,
+    output: mpsc::Sender<TailerPayload>,
 ) {
     match event {
         TailerEvent::Start { inode, path } => {
-            start_tailer(inode, path)
+            start_tailer(inode, path, tailers, output)
         }
         TailerEvent::Stop { inode, path } => {
-
+            stop_tailer(inode, path, tailers)
         }
         TailerEvent::Rotate { old_inode, new_inode, path } => {
             // THIS ARM IS NEVER ARRIVED AT
         }
     }
-}
-
-fn start_tailer(
-    inode: u64,
-    path: PathBuf,
-    tailers: HashMap<Inode, TailerHandle>,
-    output: mpsc::Sender<TailerPayload>,
-) -> std::option::Option<TailerHandle> {
-    if tailers.contains_key(&inode) {
-        return;
-    }
-
-    // Create cancellation token for new Tailer
-
-    let new_tailer = Tailer::new(inode, path, 0, output.clone(), cancel.clone());
-
-    // [TODO]: Take the necessary action based on the TailerEvent(Start, Stop & Stop->Start)
-
-    // [TODO]: Give tracing info for the specific Tailer action taken
 }
