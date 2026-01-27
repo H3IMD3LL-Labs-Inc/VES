@@ -65,7 +65,7 @@ pub async fn handle_event(
             stop_tailer(inode, path, tailers)
         }
         TailerEvent::Rotate { old_inode, new_inode, path } => {
-            // THIS ARM IS NEVER ARRIVED AT
+            // [TODO]: Handle this
         }
     }
 }
