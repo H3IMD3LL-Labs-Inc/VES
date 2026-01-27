@@ -37,11 +37,35 @@ pub fn translate_event(
     }
 }
 
-/// Handle `TailerEvent`s for a specific `Tailer`. This allows the `TailerManager` to
-/// start, stop or manage(determine) appropriate actions a Tailer should take, based on
-/// the Tailer's `TailerEvent`s
-pub async fn handle_event(event: TailerEvent) {
-    // [TODO]: Determine the specific Tailer a TailerEvent belongs to
+pub async fn handle_event(
+    event: TailerEvent,
+) {
+    match event {
+        TailerEvent::Start { inode, path } => {
+            start_tailer(inode, path)
+        }
+        TailerEvent::Stop { inode, path } => {
+
+        }
+        TailerEvent::Rotate { old_inode, new_inode, path } => {
+            // THIS ARM IS NEVER ARRIVED AT
+        }
+    }
+}
+
+fn start_tailer(
+    inode: u64,
+    path: PathBuf,
+    tailers: HashMap<Inode, TailerHandle>,
+    output: mpsc::Sender<TailerPayload>,
+) -> std::option::Option<TailerHandle> {
+    if tailers.contains_key(&inode) {
+        return;
+    }
+
+    // Create cancellation token for new Tailer
+
+    let new_tailer = Tailer::new(inode, path, 0, output.clone(), cancel.clone());
 
     // [TODO]: Take the necessary action based on the TailerEvent(Start, Stop & Stop->Start)
 
