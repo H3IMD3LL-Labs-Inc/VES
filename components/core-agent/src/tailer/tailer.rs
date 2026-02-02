@@ -91,4 +91,4 @@ pub fn stop_tailer(
     return;
 }
 
-// [TODO]: Payload builder and transmission logic
+// [TODO]: build_payload() method
