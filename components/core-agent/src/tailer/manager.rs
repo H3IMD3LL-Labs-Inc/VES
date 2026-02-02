@@ -23,7 +23,6 @@ impl TailerManager {
         checkpoint: Checkpoint,
         parent_cancel: CancellationToken,
     ) -> Self {
-        // [TODO]: Fix CancellationToken handling Root -> TailerManager -> Tailers
         let cancel = parent_cancel.child_token();
 
         // [TODO]: Use output_rx in the next stage of the normalization stage
@@ -54,8 +53,10 @@ impl TailerManager {
                 },
 
                 Ok(payload) = self.watcher_rx.recv() => {
+                    let manager_cancel = &self.cancel.clone();
+
                     for event in translate_event(payload) {
-                        handle_event(event, &mut self.tailers, self.output.clone()).await;
+                        handle_event(event, &mut self.tailers, self.output.clone(), manager_cancel).await;
                     }
                 }
             }

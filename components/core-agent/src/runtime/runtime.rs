@@ -22,7 +22,7 @@ pub async fn run_log_collector(config_path: PathBuf) -> Result<()> {
     let shutdown_signal = shutdown.clone();
 
     // Initialize CancellationToken
-    let global_cancel = CancellationToken::new();
+    let global_cancel_token = CancellationToken::new();
 
     // Load Core Agent configurations
     let cfg = Config::load(&config_path)?;
