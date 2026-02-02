@@ -21,6 +21,7 @@ use crate::{
 // External crates
 use std::collections::HashMap;
 use tokio::sync::mpsc;
+use tokio_util::sync::CancellationToken;
 
 pub fn translate_event(
     payload: WatcherPayload
@@ -56,16 +57,21 @@ pub async fn handle_event(
     event: TailerEvent,
     tailers: &mut HashMap<Inode, TailerHandle>,
     output: mpsc::Sender<TailerPayload>,
+    cancel: &CancellationToken,
 ) {
     match event {
         TailerEvent::Start { inode, path } => {
-            start_tailer(inode, path, tailers, output)
+            start_tailer(
+                inode, path, tailers, output, cancel
+            )
         }
         TailerEvent::Stop { inode, path } => {
-            stop_tailer(inode, path, tailers)
+            stop_tailer(inode, tailers)
         }
+        // [TODO]: Explicitly specify old and new paths
         TailerEvent::Rotate { old_inode, new_inode, path } => {
-            // THIS ARM IS NEVER ARRIVED AT
+            stop_tailer(old_inode, tailers);
+            start_tailer(new_inode, path, tailers, output, cancel)
         }
     }
 }

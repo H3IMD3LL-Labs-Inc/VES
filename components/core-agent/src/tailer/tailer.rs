@@ -34,10 +34,15 @@ impl Tailer {
     /// Run loop for an already spawned/created `Tailer`, where the lifecycle
     /// which is managed by the `TailerManager`, `Payload` transmission, and
     /// management for an individual running Tailer takes place.
-    pub async fn run(mut self) -> Result<()> {
-        // [TODO]:
-        // 1. Run an already spawned Tailer, responding to TailerManager instructions
-        // 2. Transmit Payload to the Parser...
+    pub async fn run(self) -> Result<()> {
+        loop {
+            tokio::select! {
+                _ = self.cancel.cancelled() => {
+                    break;
+                }
+                // [TODO]: Payload transmission goes here...
+            }
+        }
 
         Ok(())
     }
@@ -48,15 +53,20 @@ pub fn start_tailer(
     path: PathBuf,
     tailers: &mut HashMap<Inode, TailerHandle>,
     output: mpsc::Sender<TailerPayload>,
+    cancel: &CancellationToken,
 ) {
     if tailers.contains_key(&inode) {
         return;
     }
 
-    // [TODO]: CancellationToken handling/creation
+    let tailer_cancel = cancel.child_token();
 
     let new_tailer = Tailer::new(
-        inode, path, 0, output.clone(), cancel.clone(),
+        inode,
+        path,
+        0,
+        output.clone(),
+        tailer_cancel.clone(),
     );
 
     let handle = tokio::task::spawn(
@@ -64,7 +74,7 @@ pub fn start_tailer(
     );
 
     tailers.insert(
-        inode, TailerHandle { join: handle, cancel: cancel.clone() }
+        inode, TailerHandle { join: handle, cancel: tailer_cancel }
     );
 
     return;
@@ -72,8 +82,13 @@ pub fn start_tailer(
 
 pub fn stop_tailer(
     inode: u64,
-    path: PathBuf,
     tailers: &mut HashMap<Inode, TailerHandle>,
 ) {
-    // [TODO]: Gracefully Shutdown a running Tailer
+    if let Some(handle) = tailers.remove(&inode) {
+        handle.cancel.cancel();
+    }
+
+    return;
 }
+
+// [TODO]: Payload builder and transmission logic
