@@ -66,10 +66,12 @@ pub async fn handle_event(
             )
         }
         TailerEvent::Stop { inode, path } => {
-            stop_tailer(inode, path, tailers)
+            stop_tailer(inode, tailers)
         }
+        // [TODO]: Explicitly specify old and new paths
         TailerEvent::Rotate { old_inode, new_inode, path } => {
-            // [TODO]: Handle this
+            stop_tailer(old_inode, tailers);
+            start_tailer(new_inode, path, tailers, output, cancel)
         }
     }
 }
