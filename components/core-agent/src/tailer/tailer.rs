@@ -1,9 +1,12 @@
 // Local crates
-use crate::tailer::models::{
-    Inode,
-    Tailer,
-    TailerHandle,
-    TailerPayload,
+use crate::tailer::{
+    models::{
+        Inode,
+        Tailer,
+        TailerHandle,
+        TailerPayload,
+    },
+    payload::build_payload,
 };
 
 // External crates
@@ -40,7 +43,9 @@ impl Tailer {
                 _ = self.cancel.cancelled() => {
                     break;
                 }
-                // [TODO]: Payload transmission goes here...
+                // [TODO]: Build TailerPayload being sent
+
+                // [TODO]: Payload transmission goes here
             }
         }
 
@@ -80,15 +85,4 @@ pub fn start_tailer(
     return;
 }
 
-pub fn stop_tailer(
-    inode: u64,
-    tailers: &mut HashMap<Inode, TailerHandle>,
-) {
-    if let Some(handle) = tailers.remove(&inode) {
-        handle.cancel.cancel();
-    }
-
-    return;
-}
-
-// [TODO]: Payload builder and transmission logic
+// [TODO]: Send TailerPayload to downstream processing...
