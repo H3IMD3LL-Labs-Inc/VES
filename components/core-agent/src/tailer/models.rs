@@ -80,3 +80,5 @@ pub struct TailerPayload {
     pub raw_data: Bytes,
     pub size: usize,
 }
+
+// [TODO]: New FileIdentity struct to allow robust file id using Fingerprint
