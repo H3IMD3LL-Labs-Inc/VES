@@ -1,92 +1,69 @@
-# 🤝 Contributing to VES
+# Contributing to VES
 
-Thank you for your interest in contributing :)
-VES is still in its early stage (`v0.1.0`), so contributions of **any size** — from filing issues, adding features to just using VES and giving your thoughts — are valuable.
+## Overview
+VES is a high performance, highly configurable and easy-to-understand observability data platform. Before you get started contributing make sure you read these docs; [CODE OF CONDUCT](CODE_OF_CONDUCT.md), [CONTRIBUTOR DOCS](CONTRIBUTORS.md), [LICENSE](LICENSE.md), [README](README.md), [SECURITY](SECURITY.md). It is recommended you understand these docs before you start contributing inorder to give yourself and other contributors an easy time.
 
----
+## Getting Started
+If you're new to contributing to VES, ensure your development environment (e.g., laptop/PC) has the following installed;
+- Rust v1.89.0+ [Install Rust](https://rust-lang.org/tools/install/)
+- Git [Install Git](https://git-scm.com/install/)
+- Protobuf [Install Protobuf](https://protobuf.dev/installation/)
+- rust-analyzer: Check your specific IDEs support/extensions
+- cargo-watch: For developement auto-reloading
+- cargo-nextest: Fast test runs
 
-## 📌 How to Contribute
+Other recommendations, but not necessary;
+Zed IDE [Install Zed](https://zed.dev/download), with the following extensions;
+   - TOML v1.0.1 
+   - Dockerfile v0.1.0
+   - Proto v0.3.1
+   - Tombi | TOML Toolkit v0.2.0
+   - GitHub Actions v0.0.1
+   - MDX v0.3.0
+   - wakatime v0.1.10
 
-### 1. Report Issues
-- Use the **Bug Report** issue template if you find a bug.
-- Use the **Feature Request** issue template for new ideas/features.
-- Use the **Roadmap Module** issue template to help track roadmap items, or create issues for any additions to the current `v1.0.0` roadmap track.
+These are just "other" recommendations not necessities, feel free to skip them if you already have a fully setup Rust development environment you're comfortable working in.
 
-### 2. Suggest Improvements
-- Discussions are open — share ideas, ask questions, or give feedback.
-- PRs are welcome for almost anything at this stage; **documentation improvements**, **feature requests**, **and just about anything relevant**.
+## How To Contribute
 
-### 3. Code Contributions
-- Fork the repo, clone it locally and go to the root directory:
+### Reporting and Resolving Issues
+- First of all, check our [current issues](https://github.com/H3IMD3LL-Labs-Inc/VES/issues) to confirm your issue isn't a duplicate.
+- Use a clear/descriptive title, description and suggestion when creating the issue using the provided issue template.
+- Add relevant code blocks, OS information, VES version and or related issue(s).
+
+### Contribution Steps
+1. **Fork the latest version of the repo** from GitHub and **clone your forked repo locally**
 ```bash
 git clone https://github.com/H3IMD3LL-Labs-Inc/VES.git
+```
+
+2. **Ensure you are in the source directory** of your cloned fork
+```bash
 cd VES
 ```
-- Create a branch in the root directory of your local VES repo based on your contribution using the following syntax:
+
+3. **Create a feature branch to work on your changes**, following [BRANCHING GUIDELINES](BRANCHING_GUIDELINES.md)
 ```bash
-git checkout -b [feature, improvement or other contribution]/what-the-branch-is-for
+git checkout -b <contribution_type>/<name-of-work>
 ```
-- Write clear, understandable commit messages, for example:
+
+4. **Work on your changes on the feature branch you have created**, following [CODE GUIDELINES](CODE_GUIDELINES.md)
+
+5. **Commit your changes with clear and descriptive commit messages**, following [CODE GUIDELINES](CODE_GUIDELINES.md)
 ```bash
-git commit -m "what-the-feature-does-feature"
+git add <contribution-type>/<name-of-work> \n
+git commit -m <clear-short-and-descriptive-commit-message>
 ```
-- Ensure your code is formatted, tested and complies with our code style.
-- Submit a PR referencing the related issue you have worked on and await review and approval.
 
-VES will try to respond to PRs in a timely manner to ensure contributors can get back in the flow and not lose interest in their individual contributions.
+6. **Push your commited work to your fork**
+```bash
+git push -u origin <contribution-type>/<name-of-work>
+```
 
----
+7. **Open a PR** against VES' actual `integration` branch
 
-## ✅ Development Environment Setup (for VES Core)
+8. **Respond to feedback** from the reviewer
 
-1. Setup your development environment
-- Install Rust (latest stable release version):
-  - Linux, macOS, Unix-like OS:
-  ```bash
-  curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
-  ```
-  - After installation, run the following command to ensure everything is setup correctly:
-  ```bash
-  rustc --version
-  ```
+See [BRANCHING GUIDELINES](BRANCHING_GUIDELINES.md), to understand clearly how the above approach works in detail.
 
-  - For **Windows OS**, go to the [Rust official website](rust-lang.org/tools/install/) and download the installer for your PC architecture `32-bit` or `64-bit`:
-
-  ![Rust windows OS installer website](/assets/images/rust_windows_installer_page.jpeg)
-
-- Install Protoc Pre-compiled Binaries (Any OS)
-  - To install the latest release of the protocol compiler from pre-compiled binaries, follow these [instructions](https://protobuf.dev/installation/)
-
-2. Clone the repo locally:
-   ```bash
-   git clone https://github.com/H3IMD3LL-Labs-Inc/VES.git
-   cd VES.git
-   ```
-
-3. Run tests in the project directory on your machine:
-   ```bash
-   cargo test
-   ```
-
-## 🔒 Security
-
-Please do not report security vulnerabilities in public issues or PRs. See our [Security Policy](./SECURITY.md) for responsible disclosure guidelines.
-
-## 📍 Roadmap
-
-You can view VES's roadmap in [README.md#roadmap](./README.md#roadmap).
-
-To help with a roadmap item:
-- Open a Roadmap Module issue.
-- Break the work into subtasks, if possible to plan and track progress.
-- Submit PRs linked to that issue.
-
-## 🙏 Community
-- Be respectful and constructive in discussions.
-- Ask questions — there are no bad questions, but there can be bad answers.
-- Early contributors will help shape the direction of VES.
-
-## 💡 Questions?
-
-- Open/Join a [GitHub Discussion](https://github.com/H3IMD3LL-Labs-Inc/VES/discussions)
-- Email any other [questions](mailto:dennis.njuguna@heimdelllabs.cloud)
+Also, check [PR GUIDELINES](PR_GUIDELINES.md) to see how you're PRs should be inorder to be most likely accepted.
