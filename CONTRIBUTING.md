@@ -42,20 +42,20 @@ git clone https://github.com/H3IMD3LL-Labs-Inc/VES.git
 cd VES
 ```
 
-3. **Create a feature branch to work on your changes**, following [BRANCHING GUIDELINES](BRANCHING_GUIDELINES.md)
+3. **Create a change branch to work on your changes**, following [BRANCHING GUIDELINES](BRANCHING_GUIDELINES.md)
 ```bash
 git checkout -b <contribution_type>/<name-of-work>
 ```
 
-4. **Work on your changes on the feature branch you have created**, following [CODE GUIDELINES](CODE_GUIDELINES.md)
+4. **Work on your contributions on the change branch you have created**, following [CODE GUIDELINES](CODE_GUIDELINES.md)
 
-5. **Commit your changes with clear and descriptive commit messages**, following [CODE GUIDELINES](CODE_GUIDELINES.md)
+5. **Commit your changes with clear and descriptive commit messages**, following [CODE STYLE GUIDELINES](CODE_STYLEGUIDELINES.md)
 ```bash
 git add <contribution-type>/<name-of-work> \n
 git commit -m <clear-short-and-descriptive-commit-message>
 ```
 
-6. **Push your commited work to your fork**
+6. **Push your commited work to your fork**'s `main` branch when ready
 ```bash
 git push -u origin <contribution-type>/<name-of-work>
 ```
