@@ -41,6 +41,7 @@ jobs:
 
       - name: Run rust-clippy
         run:
+          # [TODO]: Configure clippy to treat warnings as warnings and errors as workflow-breaking
           cargo clippy
           --all-features
           --message-format=json | clippy-sarif | tee rust-clippy-results.sarif | sarif-fmt
