@@ -1,9 +1,41 @@
-# Module labels
-core-agent:
-  - "components/core-agent/**"
+docs:
+  - changed-files:
+    - any-glob-to-any-file: '**/*.md'
 
-  # Infrastructure / setup
+adr:
+  - changed-files:
+    - any-glob-to-any-file: ADR/*
+
+core-agent:
+  - changed-files:
+    - any-glob-to-any-file:
+      - components/core-agent/**
+
+github-actions:
+  - changed-files:
+    - any-glob-to-any-file:
+      - .github/**
+
 scripts:
-  - "scripts/**"
-github:
-  - ".github/**"
+  - changed-files:
+    - any-glob-to-any-file:
+      - scripts/**
+
+component-tests:
+  - changed-files:
+    - any-glob-to-any-file: components/tests
+
+ves-tests:
+  - changed-files:
+    - any-glob-to-any-file: test-suite/ves-tests
+
+cloud:
+  - changed-files:
+    - any-glob-to-any-file:
+      - Docker/**
+
+integration:
+  - base-branch: 'integration'
+
+release:
+  - base-branch: 'main'
