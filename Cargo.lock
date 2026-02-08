@@ -437,6 +437,7 @@ dependencies = [
  "hyper-util",
  "lazy_static",
  "notify",
+ "pin-project",
  "prometheus",
  "prost",
  "prost-types",
