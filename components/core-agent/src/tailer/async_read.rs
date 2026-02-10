@@ -10,7 +10,7 @@ use tokio::io::{AsyncRead, ReadBuf, Result as IoResult};
 ///
 /// This assumes any stop conditions are treated as EOFs. See [this code](https://github.com/vectordotdev/vector/blob/master/src/async_read.rs)
 
-pub trait AsyncReadExt: AsyncRead {
+pub trait CustomAsyncReadExt: AsyncRead {
     fn read_until_future<F>(self, until: F) -> ReadUntil<Self, F>
     where
         Self: Sized,
@@ -23,7 +23,7 @@ pub trait AsyncReadExt: AsyncRead {
     }
 }
 
-impl<S> AsyncReadExt for S
+impl<S> CustomAsyncReadExt for S
 where
     S: AsyncRead {}
 
