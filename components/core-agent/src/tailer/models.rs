@@ -75,7 +75,7 @@ pub struct Tailer {
 /// piece of data read from a file. It is not bytes, not lines necessarily, and not
 /// file metadata.
 pub struct TailerPayload {
-    pub raw_data: Bytes,
+    pub raw_data: Vec<Bytes>,
     pub size: usize,
 }
 
