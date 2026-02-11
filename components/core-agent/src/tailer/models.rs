@@ -1,9 +1,11 @@
 // Local crates
 use crate::watcher::models::{Checkpoint, WatcherPayload};
+use crate::tailer::async_read::ReadUntil;
 
 // External crates
 use anyhow::Result;
 use bytes::Bytes;
+use tokio::fs::File;
 use std::collections::HashMap;
 use std::path::PathBuf;
 use tokio::sync::{broadcast, mpsc};
@@ -79,4 +81,10 @@ pub struct TailerPayload {
     pub size: usize,
 }
 
-// [TODO]: New FileIdentity struct to allow robust file id using Fingerprint
+/// `TailerReader` is a streaming source reader, currently only implemented for file
+/// reads, wraps a source plus "stop" future and reads only new bytes from the source,
+/// incrementally without re-opening the source.
+pub struct TailerReader<F> {
+    pub reader: ReadUntil<File, F>,
+    pub buffer: Vec<u8>,
+}
