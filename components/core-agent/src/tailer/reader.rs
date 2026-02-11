@@ -19,6 +19,8 @@ pub async fn read_data(
 ) -> std::io::Result<Vec<Bytes>> {
     let file = File::open(&path).await?;
 
+    tokio::pin!(stop);
+
     let mut reader = file.read_until_future(stop);
 
     let mut chunks: Vec<Bytes> = Vec::new();
@@ -26,12 +28,6 @@ pub async fn read_data(
     loop {
         let mut buffer = vec![0u8; READ_BUFFER_SIZE];
 
-        // [TODO-FIX]:
-        // impl std::future::Future<Output = ()> cannot be unpinned
-        // within __ReadUntil<'_, tokio::fs::File, impl std::future::Future<Output = ()>>, the trait Unpin is not implemented for impl std::future::Future<Output = ()>
-        // consider using the pin! macro
-        // consider using Box::pin if you need to access the pinned value outside of the current scope (rustc E0277)
-        // hint: consider restricting opaque type `impl std::future::Future<Output = ()>` with trait `Unpin`: ` + std::marker::Unpin`
         let n = reader.read(&mut buffer).await?;
 
         if n == 0 {
