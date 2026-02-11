@@ -85,4 +85,9 @@ pub fn start_tailer(
     return;
 }
 
-// [TODO]: Send TailerPayload to downstream processing...
+async fn send_payload_downstream(
+    payload: TailerPayload,
+    output_channel: &mpsc::Sender<TailerPayload>,
+) -> Result<(), mpsc::error::SendError<TailerPayload>> {
+    output_channel.send(payload).await
+}
