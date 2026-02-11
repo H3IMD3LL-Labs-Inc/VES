@@ -4,3 +4,4 @@ pub mod tailer;
 pub mod tailer_events;
 pub mod payload;
 pub mod async_read;
+pub mod reader;
