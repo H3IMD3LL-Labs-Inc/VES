@@ -15,7 +15,6 @@ use std::path::PathBuf;
 use std::collections::HashMap;
 use tokio::sync::mpsc;
 use tokio_util::sync::CancellationToken;
-use tokio::sync::mpsc::error::SendError;
 
 impl Tailer {
     /// Create a new individual Tailer for a specific file(inode)
