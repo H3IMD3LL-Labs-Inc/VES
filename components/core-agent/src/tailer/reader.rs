@@ -1,9 +1,9 @@
 // Local crates
 use crate::tailer::async_read::CustomAsyncReadExt;
+use crate::tailer::models::TailerReader;
 
 // External crates
 use bytes::Bytes;
-use std::path::PathBuf;
 use tokio::fs::File;
 use tokio::io::AsyncReadExt;
 
@@ -13,32 +13,31 @@ const READ_BUFFER_SIZE: usize = 16384;
 /// read bytes. This data is used to consurct the TailerPayload.
 ///
 /// See [TailerPayload builder](components/core-agent/src/tailer/payload.rs).
-pub async fn read_data(
-    path: PathBuf,
-    stop: impl std::future::Future<Output = ()>,
-) -> std::io::Result<Vec<Bytes>> {
-    let file = File::open(&path).await?;
-
-    tokio::pin!(stop);
-
-    let mut reader = file.read_until_future(stop);
-
-    let mut chunks: Vec<Bytes> = Vec::new();
-
-    loop {
-        let mut buffer = vec![0u8; READ_BUFFER_SIZE];
-
-        let n = reader.read(&mut buffer).await?;
-
-        if n == 0 {
-            // [TODO]: Handle, EOF or stop condition
-            break;
+impl<F> TailerReader<F>
+where
+    F: std::future::Future<Output = ()> + Unpin,
+{
+    pub fn new(
+        file: File,
+        stop: F,
+    ) -> Self {
+        Self {
+            reader: file.read_until_future(stop),
+            buffer: vec![0u8; READ_BUFFER_SIZE],
         }
-
-        buffer.truncate(n);
-
-        chunks.push(Bytes::from(buffer));
     }
 
-    Ok(chunks)
+    pub async fn read_data_chunk(
+        &mut self,
+    ) -> std::io::Result<Option<Bytes>> {
+        let n = self.reader.read(&mut self.buffer).await?;
+
+        if n == 0 {
+            return Ok(None);
+        }
+
+        let chunk = Bytes::copy_from_slice(&self.buffer[..n]);
+
+        Ok(Some(chunk))
+    }
 }
