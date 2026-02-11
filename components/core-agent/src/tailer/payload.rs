@@ -6,14 +6,14 @@ use bytes::Bytes;
 
 #[allow(unused_doc_comments)]
 pub fn build_payload(
-    buffer: Vec<Bytes>,
+    chunk: Bytes,
 ) -> TailerPayload {
 
     /// This is required ONLY for metrics currently
-    let data_size = buffer.iter().map(|b| b.len()).sum();
+    let data_size = chunk.len();
 
     TailerPayload {
-        raw_data: buffer,
+        raw_data: chunk,
         size: data_size,
     }
 }
