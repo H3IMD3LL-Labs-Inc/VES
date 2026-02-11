@@ -5,6 +5,7 @@ use crate::tailer::{
         Tailer,
         TailerHandle,
         TailerPayload,
+        TailerReader,
     },
     payload::build_payload,
 };
@@ -15,6 +16,7 @@ use std::path::PathBuf;
 use std::collections::HashMap;
 use tokio::sync::mpsc;
 use tokio_util::sync::CancellationToken;
+use tokio::fs::File;
 
 impl Tailer {
     /// Create a new individual Tailer for a specific file(inode)
@@ -38,14 +40,23 @@ impl Tailer {
     /// which is managed by the `TailerManager`, `Payload` transmission, and
     /// management for an individual running Tailer takes place.
     pub async fn run(self) -> Result<()> {
+        let file = File::open(&self.path).await?;
+
+        // [TODO]: Actually implement the stop condition, LOL ;)
+        let mut reader = TailerReader::new(file, stop);
+
         loop {
             tokio::select! {
                 _ = self.cancel.cancelled() => {
                     break;
                 }
-                // [TODO]: Build TailerPayload being sent
 
-                // [TODO]: Payload transmission goes here
+                read_data = reader.read_data_chunk() => {
+                    if let Some(data) = read_data? {
+                        let tailer_payload = build_payload(data);
+                        send_payload_downstream(tailer_payload, &self.output).await?;
+                    }
+                }
             }
         }
 
