@@ -96,6 +96,17 @@ pub fn start_tailer(
     return;
 }
 
+pub fn stop_tailer(
+    inode: u64,
+    tailers: &mut HashMap<Inode, TailerHandle>,
+) {
+    if let Some(tailer_handle) = tailers.remove(&inode) {
+        tailer_handle.cancel.cancel();
+    }
+
+    return;
+}
+
 async fn send_payload_downstream(
     payload: TailerPayload,
     output_channel: &mpsc::Sender<TailerPayload>,
