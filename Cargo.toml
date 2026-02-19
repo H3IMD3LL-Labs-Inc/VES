@@ -2,10 +2,38 @@
 members = [
     "components/core-agent",
 ]
+resolver = "2"
+
+[workspace.package]
+authors = ["Dennis Njuguna <dennis.njuguna@heimdelllabs.cloud>"]
+edition = "2024"
+rust-version = "1.89"
+license = "AGPL-3.0"
+license-file = "LICENSE.md"
+repository = "https://github.com/H3IMD3LL-Labs-Inc/VES"
+homepage = "https://ves.heimdelllabs.cloud"
+readme = "README.md"
+
+[workspace.lints.rust]
+unsafe_code = "deny"
+dead_code = "warn"
+unexpected_cfgs = { level = "warn", check-cfg = ['cfg(tokio_unstable)'] }
+missing_debug_implementations = "warn"
+missing_docs = "warn"
+
+[workspace.lints.clippy]
+enum_glob_use = "warn"
+unwrap_used = "warn"
+expect_used = "warn"
+panic = "warn"
+todo = "warn"
+dbg_macro = "warn"
+large_futures = "warn"
+must_use_candidate = "warn"
 
 [workspace.dependencies]
 anyhow = "1.0.99"
-serde = "1.0.219"
+serde = { version = "1.0.219", features = ["derive"] }
 serde_json = "1.0.143"
 toml = "0.9.5"
 regex = "1.11.2"
@@ -42,3 +70,36 @@ sysinfo = "0.37.2"
 walkdir = "2.5.0"
 async-stream = "0.3.6"
 pin-project = "1"
+
+[profile.dev]
+opt-level = 0
+debug = true
+split-debuginfo = "packed"
+strip = "none"
+debug-assertions = true
+overflow-checks = true
+lto = false
+panic = "unwind"
+incremental = true
+codegen-units = 256
+rpath = false
+
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 16
+debug = false
+strip = "none"
+debug-assertions = false
+panic = "abort"
+overflow-checks = false
+incremental = false
+
+[profile.release-with-debug]
+inherits = "release"
+debug = true
+strip = "none"
+
+[profile.bench]
+inherits = "release"
+debug = true
