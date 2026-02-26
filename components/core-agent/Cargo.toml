@@ -53,6 +53,7 @@ sysinfo.workspace = true
 walkdir.workspace = true
 async-stream.workspace = true
 pin-project.workspace = true
+lmdb.workspace = true
 
 [build-dependencies]
 tonic-prost-build = "0.14.2"
