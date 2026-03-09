@@ -34,4 +34,9 @@ impl PersistenceEngine {
             Err(_) => false,
         }
     }
+
+    // [TODO]: Add a method that uses Environment::stat() to give a view of
+    //         the environment's Stat struct containing; psize, depth, branch_pages,
+    //         leaf_pages, overflow_pages and entries. This will allow; capacity
+    //         planning, PersistenceEngine monitoring, debugging performance
 }

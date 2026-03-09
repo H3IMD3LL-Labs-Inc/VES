@@ -3,6 +3,7 @@ use crate::recovery::environment::PersistenceEngine;
 
 // External crates
 use lmdb::{
+    Database,
     RoTransaction,
     RwTransaction,
     Transaction,
@@ -23,6 +24,13 @@ where
 {
     let txn = env.engine.begin_ro_txn()?;
     f(&txn)
+}
+
+pub fn read_only_cursor<'txn>(
+    txn: &'txn RoTransaction,
+    db: Database,
+) -> Result<lmdb::RoCursor<'txn>, DbError> {
+    txn.open_ro_cursor(db)
 }
 
 /// Consider a single writer thread where all Core Agent stages send
