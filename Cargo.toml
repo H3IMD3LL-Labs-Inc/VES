@@ -71,6 +71,7 @@ walkdir = "2.5.0"
 async-stream = "0.3.6"
 pin-project = "1"
 lmdb = "0.8.0"
+lmdb-sys = "0.8.0"
 
 [profile.dev]
 opt-level = 0

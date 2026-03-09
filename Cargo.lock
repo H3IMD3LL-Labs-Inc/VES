@@ -643,6 +643,7 @@ dependencies = [
  "hyper-util",
  "lazy_static",
  "lmdb",
+ "lmdb-sys",
  "notify",
  "pin-project",
  "prometheus",
