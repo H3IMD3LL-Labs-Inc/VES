@@ -130,7 +130,7 @@ impl<'a> TxnReader<'a> {
     pub fn traverse_full_ordered<F>(
         &self,
         db: Database,
-        mut f: F,
+        f: F,
     ) -> Result<usize, DbError>
     where
         F: FnMut(&[u8], &[u8]),
@@ -150,7 +150,7 @@ impl<'a> TxnReader<'a> {
         &self,
         db: Database,
         start_key: K,
-        mut f: F,
+        f: F,
     ) -> Result<usize, DbError>
     where
         F: FnMut(&[u8], &[u8]),
@@ -171,7 +171,7 @@ impl<'a> TxnReader<'a> {
         &self,
         db: Database,
         prefix: K,
-        mut f: F,
+        f: F,
     ) -> Result<usize, DbError>
     where
         F: FnMut(&[u8], &[u8]),
@@ -194,7 +194,7 @@ impl<'a> TxnReader<'a> {
         start_key: Option<K>,
         end_key: Option<&[u8]>,
         limit: Option<usize>,
-        mut f: F,
+        f: F,
     ) -> Result<usize, DbError>
     where
         F: FnMut(&[u8], &[u8]),
@@ -215,7 +215,7 @@ impl<'a> TxnReader<'a> {
         &self,
         db: Database,
         start_key: Option<K>,
-        mut f: F,
+        f: F,
     ) -> Result<usize, DbError>
     where
         F: FnMut(&[u8], &[u8]),
