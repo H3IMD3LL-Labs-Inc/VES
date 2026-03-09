@@ -126,4 +126,109 @@ impl<'a> TxnReader<'a> {
             Ok(processed)
         })
     }
+
+    pub fn traverse_full_ordered<F>(
+        &self,
+        db: Database,
+        mut f: F,
+    ) -> Result<usize, DbError>
+    where
+        F: FnMut(&[u8], &[u8]),
+    {
+        let config = TraverseConfig {
+            start: None,
+            end: None,
+            prefix: None,
+            direction: Direction::Forward,
+            limit: None,
+        };
+
+        self.traversal_internal(db, config, f)
+    }
+
+    pub fn traverse_from<F, K>(
+        &self,
+        db: Database,
+        start_key: K,
+        mut f: F,
+    ) -> Result<usize, DbError>
+    where
+        F: FnMut(&[u8], &[u8]),
+        K: AsRef<[u8]>,
+    {
+        let config = TraverseConfig {
+            start: Some(start_key.as_ref()),
+            end: None,
+            prefix: None,
+            direction: Direction::Forward,
+            limit: None,
+        };
+
+        self.traversal_internal(db, config, f)
+    }
+
+    pub fn prefix_traverse<F, K>(
+        &self,
+        db: Database,
+        prefix: K,
+        mut f: F,
+    ) -> Result<usize, DbError>
+    where
+        F: FnMut(&[u8], &[u8]),
+        K: AsRef<[u8]>,
+    {
+        let config = TraverseConfig {
+            start: Some(prefix.as_ref()),
+            end: None,
+            prefix: Some(prefix.as_ref()),
+            direction: Direction::Forward,
+            limit: None,
+        };
+
+        self.traversal_internal(db, config, f)
+    }
+
+    pub fn traverse_bounded_batch<F, K>(
+        &self,
+        db: Database,
+        start_key: Option<K>,
+        end_key: Option<&[u8]>,
+        limit: Option<usize>,
+        mut f: F,
+    ) -> Result<usize, DbError>
+    where
+        F: FnMut(&[u8], &[u8]),
+        K: AsRef<[u8]>,
+    {
+        let config = TraverseConfig {
+            start: start_key.as_ref().map(|k| k.as_ref()),
+            end: end_key,
+            prefix: None,
+            direction: Direction::Forward,
+            limit,
+        };
+
+        self.traversal_internal(db, config, f)
+    }
+
+    pub fn traverse_reverse<F, K>(
+        &self,
+        db: Database,
+        start_key: Option<K>,
+        mut f: F,
+    ) -> Result<usize, DbError>
+    where
+        F: FnMut(&[u8], &[u8]),
+        K: AsRef<[u8]>,
+    {
+        let config = TraverseConfig {
+            start: start_key.as_ref().map(|k| k.as_ref()),
+            end: None,
+            prefix: None,
+            direction: Direction::Backward,
+            limit: None,
+        };
+
+        self.traversal_internal(db, config, f)
+    }
 }
