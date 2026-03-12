@@ -1,6 +1,7 @@
 [workspace]
 members = [
     "components/core-agent",
+    "components/heimdell",
 ]
 resolver = "2"
 
