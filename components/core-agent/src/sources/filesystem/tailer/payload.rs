@@ -1,5 +1,5 @@
 // Local crates
-use crate::tailer::models::TailerPayload;
+use crate::sources::filesystem::tailer::models::TailerPayload;
 
 // external crates
 use bytes::Bytes;

@@ -1,6 +1,6 @@
 // Local crates
-use crate::tailer::async_read::CustomAsyncReadExt;
-use crate::tailer::models::TailerReader;
+use crate::sources::filesystem::tailer::async_read::CustomAsyncReadExt;
+use crate::sources::filesystem::tailer::models::TailerReader;
 
 // External crates
 use bytes::Bytes;

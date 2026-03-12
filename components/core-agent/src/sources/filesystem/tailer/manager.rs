@@ -1,12 +1,17 @@
 // Local crates
-use crate::tailer::{
+use crate::sources::filesystem::tailer::{
     models::{
         TailerManager,
         TailerPayload,
     },
     tailer_events::{handle_event, translate_event},
 };
-use crate::watcher::models::{Checkpoint, WatcherPayload};
+use crate::sources::filesystem::watcher::{
+    models::{
+        Checkpoint,
+        WatcherPayload
+    },
+};
 
 // External crates
 use anyhow::Result;

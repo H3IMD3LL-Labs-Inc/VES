@@ -1,11 +1,14 @@
 // Local crates
-use crate::{
-    helpers::load_config::WatcherConfig,
-    watcher::{
-        models::{Checkpoint, WatcherEvent, WatcherPayload},
-        state::determine_file_state,
+use crate::sources::filesystem::watcher::{
+    models::{
+        Checkpoint,
+        WatcherEvent,
+        WatcherPayload
     },
+    state::determine_file_state,
 };
+
+use crate::helpers::load_config::WatcherConfig;
 
 // External crates
 use anyhow::Result;
