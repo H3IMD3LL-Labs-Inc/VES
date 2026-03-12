@@ -1,5 +1,5 @@
 // Local crates
-use crate::{
+use crate::sources::filesystem::{
     tailer::{
         tailer::{
             start_tailer,

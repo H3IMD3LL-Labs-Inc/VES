@@ -1,6 +1,11 @@
 // Local crates
-use crate::watcher::models::{Checkpoint, WatcherPayload};
-use crate::tailer::async_read::ReadUntil;
+use crate::sources::filesystem::watcher::{
+    models::{
+        Checkpoint,
+        WatcherPayload
+    },
+};
+use crate::sources::filesystem::tailer::async_read::ReadUntil;
 
 // External crates
 use anyhow::Result;
