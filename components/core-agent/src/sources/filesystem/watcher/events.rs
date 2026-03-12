@@ -1,5 +1,5 @@
 // Local crates
-use crate::watcher::models::WatcherEvent;
+use crate::sources::filesystem::watcher::models::WatcherEvent;
 
 // External crates
 use notify::{

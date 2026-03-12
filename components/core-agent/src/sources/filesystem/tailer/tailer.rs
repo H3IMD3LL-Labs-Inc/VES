@@ -1,5 +1,5 @@
 // Local crates
-use crate::tailer::{
+use crate::sources::filesystem::tailer::{
     models::{
         Inode,
         Tailer,

@@ -1,5 +1,4 @@
-mod tailer;
-mod watcher;
+mod sources;
 mod recovery;
 
 fn main() {

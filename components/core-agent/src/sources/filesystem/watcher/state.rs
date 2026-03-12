@@ -1,5 +1,5 @@
 // Local crates
-use crate::watcher::models::FileState;
+use crate::sources::filesystem::watcher::models::FileState;
 
 // External crates
 use std::os::unix::fs::MetadataExt;
