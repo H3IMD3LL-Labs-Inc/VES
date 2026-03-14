@@ -5,7 +5,6 @@
 
 pub enum StorageEngine {
     Lmdb,
-    // [TODO]: Support other storage engines
 }
 
 pub struct StorageConfig {
