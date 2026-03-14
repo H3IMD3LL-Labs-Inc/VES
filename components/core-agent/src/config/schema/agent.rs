@@ -17,11 +17,11 @@ pub enum EnvironmentProvider {
     Static,
     Host,
     AwsEc2 {
-        use_instance_id: bool,
+        use_instance_id_in_node_id: bool,
         use_instance_type: bool,
         use_ami_id: bool,
         use_availability_zone: bool,
-        us_region: bool,
+        use_region: bool,
         use_hostname: bool,
     },
     Docker,
