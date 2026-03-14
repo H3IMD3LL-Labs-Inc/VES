@@ -5,19 +5,29 @@
 // corresponds to one driver instance. i.e, a filesystem driver might be
 // configured to watch multiple directories, here each configuration entry
 // becomes one driver instance. All configured source drivers are grouped
-// and aggregated together
+// and aggregated together using SourceConfig
 //
-// Remember, this schema provides the data that the runtime later uses to spawn
-// source driver instances
+// Since multiple source driver instances can be instantiated at the same time,
+// keep in mind poor management can regress system performance.
+// - Too many FileSystem Source Drivers -> OS limits exhaustion
+// - Too many sockets -> Port exhaustion
+// - Too many threads spawned -> CPU contention/exhaustion
+// - Memory Pressure
+// - Backpressure issues
 // ============================================================================
 
-enum SocketKind {
+use crate::config::schema::security::{
+    TlsVersion,
+    TrustConfig,
+};
+
+pub enum SocketKind {
     Tcp,
     Udp,
     Unix,
 }
 
-enum BindAddress {
+pub enum BindAddress {
     Inet {
         host: String,
         port: u16,
@@ -34,6 +44,7 @@ pub struct SourcesConfig {
 }
 
 pub struct FilesystemSourceConfig {
+    pub enabled: bool,
     pub id: String,
     pub paths: Vec<String>,
     pub recursive: bool,
@@ -43,23 +54,31 @@ pub struct FilesystemSourceConfig {
 }
 
 pub struct JournaldSourceConfig {
+    pub enabled: bool,
     pub id: String,
     pub units: Vec<String>,
     pub since: Option<String>,
 }
 
 pub struct SocketSourceConfig {
+    pub enabled: bool,
     pub id: String,
     pub kind: SocketKind,
     pub bind_addr: BindAddress,
-    pub tls: Option<TlsConfig>,
+    pub tls: Option<SocketTlsConfig>,
     pub tcp_options: Option<TcpOptions>,
+    pub max_connections: Option<usize>,
 }
 
-pub struct TlsConfig {
+// ====================================================================
+// Per-Socket TLS configuration, separate from global security configs
+// ====================================================================
+pub struct SocketTlsConfig {
     pub cert_path: String,
     pub key_path: String,
     pub require_client_auth: bool,
+    pub trust: Option<TrustConfig>,
+    pub min_tls_version: Option<TlsVersion>,
 }
 
 pub struct TcpOptions {
