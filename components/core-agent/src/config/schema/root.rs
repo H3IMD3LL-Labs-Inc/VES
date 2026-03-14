@@ -28,29 +28,19 @@ pub enum ConfigProvider {
 }
 
 pub struct RootConfig {
-    // Schema version for compatibility and migrations
     pub version: u32,
-    // Core Agent runtime behavior configuration
     pub agent: CoreAgentConfig,
-    // Source Drivers configuration
     pub sources: SourcesConfig,
-    // Processor pipeline configuration
     pub processor: ProcessorConfig,
-    // For-context root configuration metadata
     pub metadata: Option<RootConfigMetadata>,
-    // Persistent storage configuration
     pub storage: Option<StorageConfig>,
-    // Config security configuration
     pub security: Option<SecurityConfig>,
 }
 
 pub struct RootConfigMetadata {
     pub name: Option<String>,
     pub description: Option<String>,
-    // Configuration provider that created this configuration
     pub created_by: Option<ConfigProvider>,
-    // Unix timestamp of creation
     pub created_at: Option<u64>,
-    // Key/Value pairs for additional context
     pub labels: Vec<(String, String)>,
 }
