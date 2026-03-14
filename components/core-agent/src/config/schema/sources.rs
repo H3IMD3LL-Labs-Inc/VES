@@ -33,7 +33,6 @@ pub struct SourcesConfig {
     pub socket: Vec<SocketSourceConfig>,
 }
 
-// Read data from files on the node
 pub struct FilesystemSourceConfig {
     pub id: String,
     pub paths: Vec<String>,
@@ -43,7 +42,6 @@ pub struct FilesystemSourceConfig {
     pub file_types: Vec<String>,
 }
 
-// Read data from systemd logs on the node
 pub struct JournaldSourceConfig {
     pub id: String,
     pub units: Vec<String>,
