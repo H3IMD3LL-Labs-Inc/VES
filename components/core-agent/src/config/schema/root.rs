@@ -42,5 +42,5 @@ pub struct RootConfigMetadata {
     pub description: Option<String>,
     pub created_by: Option<ConfigProvider>,
     pub created_at: Option<u64>,
-    pub labels: Vec<(String, String)>,
+    pub labels: Option<Vec<(String, String)>>,
 }
