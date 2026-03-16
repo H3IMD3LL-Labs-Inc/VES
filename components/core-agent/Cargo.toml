@@ -55,6 +55,8 @@ async-stream.workspace = true
 pin-project.workspace = true
 lmdb.workspace = true
 lmdb-sys.workspace = true
+sha2.workspace = true
+hex.workspace = true
 
 [build-dependencies]
 tonic-prost-build = "0.14.2"
