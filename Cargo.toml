@@ -73,6 +73,8 @@ async-stream = "0.3.6"
 pin-project = "1"
 lmdb = "0.8.0"
 lmdb-sys = "0.8.0"
+sha2 = "0.10.9"
+hex = "0.4.3"
 
 [profile.dev]
 opt-level = 0
