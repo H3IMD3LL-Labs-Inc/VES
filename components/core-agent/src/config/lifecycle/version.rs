@@ -1,7 +1,3 @@
-// A RootConfig configuration "version" represents a unique identifier for a
-// RootConfig received from a Configuration Provider, this unique id is used
-// to; persist the specific config + retrieve the specific config
-
 use sha2::{Digest, Sha256};
 use hex;
 use std::fmt;
@@ -16,7 +12,6 @@ pub struct ConfigVersion {
 }
 
 impl ConfigVersion {
-    // Compute a new version from raw bytes of the canonical RootConfig
     pub fn from_bytes(bytes: &[u8], timestamp: Option<u64>) -> Self {
         let hash = Sha256::digest(bytes);
         Self {
@@ -25,13 +20,10 @@ impl ConfigVersion {
         }
     }
 
-    // Compute a new version from a serialized RootConfig
-    // Ensure canonical serialization (e.g., sorted maps, no random field ordering)
     pub fn from_root_config_bytes(config_bytes: &[u8]) -> Self {
         Self::from_bytes(config_bytes, None)
     }
 
-    // Return a short 8-character prefix for logging
     pub fn short(&self) -> &str {
         &self.hash[..8]
     }
