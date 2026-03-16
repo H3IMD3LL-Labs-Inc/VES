@@ -1,4 +1,5 @@
 pub mod schema;
+pub mod lifecycle;
 pub mod loader;
 pub mod source_providers;
 pub mod source_apis;
