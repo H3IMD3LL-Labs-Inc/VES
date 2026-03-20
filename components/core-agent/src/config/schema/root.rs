@@ -28,7 +28,6 @@ pub enum ConfigProvider {
 }
 
 pub struct RootConfig {
-    pub version: u32,
     pub agent: CoreAgentConfig,
     pub sources: SourcesConfig,
     pub processor: ProcessorConfig,

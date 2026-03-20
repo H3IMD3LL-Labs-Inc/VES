@@ -15,4 +15,5 @@
 // affecting source drivers configuration or agent runtime configurations
 // =============================================================================
 
+#[derive(Clone, PartialEq)]
 pub struct ProcessorConfig {}

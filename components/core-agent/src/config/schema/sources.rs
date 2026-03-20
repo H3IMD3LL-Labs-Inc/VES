@@ -21,12 +21,14 @@ use crate::config::schema::security::{
     TrustConfig,
 };
 
+#[derive(Clone, PartialEq)]
 pub enum SocketKind {
     Tcp,
     Udp,
     Unix,
 }
 
+#[derive(Clone, PartialEq)]
 pub enum BindAddress {
     Inet {
         host: String,
@@ -37,12 +39,14 @@ pub enum BindAddress {
     }
 }
 
+#[derive(Clone, PartialEq)]
 pub struct SourcesConfig {
     pub filesystem: Vec<FilesystemSourceConfig>,
     pub journald: Vec<JournaldSourceConfig>,
     pub socket: Vec<SocketSourceConfig>,
 }
 
+#[derive(Clone, PartialEq)]
 pub struct FilesystemSourceConfig {
     pub enabled: bool,
     pub id: String,
@@ -53,6 +57,7 @@ pub struct FilesystemSourceConfig {
     pub file_types: Vec<String>,
 }
 
+#[derive(Clone, PartialEq)]
 pub struct JournaldSourceConfig {
     pub enabled: bool,
     pub id: String,
@@ -60,6 +65,7 @@ pub struct JournaldSourceConfig {
     pub since: Option<String>,
 }
 
+#[derive(Clone, PartialEq)]
 pub struct SocketSourceConfig {
     pub enabled: bool,
     pub id: String,
@@ -73,6 +79,7 @@ pub struct SocketSourceConfig {
 // ====================================================================
 // Per-Socket TLS configuration, separate from global security configs
 // ====================================================================
+#[derive(Clone, PartialEq)]
 pub struct SocketTlsConfig {
     pub cert_path: String,
     pub key_path: String,
@@ -81,6 +88,7 @@ pub struct SocketTlsConfig {
     pub min_tls_version: Option<TlsVersion>,
 }
 
+#[derive(Clone, PartialEq)]
 pub struct TcpOptions {
     pub nodelay: bool,
     pub keep_alive_secs: Option<u64>,
