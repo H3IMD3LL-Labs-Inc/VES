@@ -1,31 +1,7 @@
-// This is the authoritative model of the agent's live runtime condition used
-// in the "Continuous Reconciliation Loop" that reconciles the last received desired_
-// state vs current_state. So basically, this is basically logic related to the
-// Core Agent's observed runtime state. This completes the "Three-Way" Config
-// Lifecycle Management logic
-//
-// NOTE:...
-// This logic obtains the Core Agent's state from memory, not persistence,
-// i.e, Active Subsystems(Source Drivers, Processor Pipeline, etc.), Running
-// tasks, Enabled Subsystem Components, Resource Handles, System Health, Core
-// Agent Version, In-Progress Operations, Last Successfully Applied Config.
-//
-// THIS IS NOT current_config THAT IS PERSISTED IN LMDB, THIS IS WHAT IS ACTUALLY
-// RUNNING IN THE CORE AGENT.
-//
-// Responsibilities;
-// - Track lifecycle of subsystems
-// - Store resource handles
-// - Track core agent health
-// - Provide introspection methods for apply.rs
-// - Support observability
-// - Idempotency
-
 use crate::config::schema::root::RootConfig;
 
 use std::collections::HashMap;
 use std::time::{Instant, Duration};
-use tokio::task::JoinHandle;
 
 #[derive(Debug, PartialEq)]
 pub enum LifecycleState {
