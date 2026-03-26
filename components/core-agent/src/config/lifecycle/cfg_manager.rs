@@ -1,10 +1,3 @@
-// This is the high-level configuration lifecycle manager, it uses logic present
-// in /config to actual perform configurations, this same logic is what is used
-// to control the "Continuous Reconciliation Loop" which keeps the Core Agent's
-// configuration in its last persisted desired_state unless a new RootConfig is
-// received which breaks then updates the "Continuous Reconciliation Loop"
-
-#[allow(unused_imports)]
 use crate::config::{
     schema::root::{RootConfig, ConfigProvider},
     lifecycle::{
