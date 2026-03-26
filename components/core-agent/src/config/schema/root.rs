@@ -21,6 +21,7 @@ use crate::config::schema::{
     storage::StorageConfig,
 };
 
+#[derive(Debug, Clone)]
 pub enum ConfigProvider {
     StaticFile,
     HEIMDELLServerRemoteAPI,

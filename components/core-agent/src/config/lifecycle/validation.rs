@@ -2,6 +2,7 @@ use crate::config::schema::root::RootConfig;
 
 use std::collections::HashSet;
 
+#[derive(Clone)]
 pub enum ValidationError {
     DuplicateId { id: String },
     MissingTlsMaterial { id: String },
@@ -15,12 +16,14 @@ pub enum ValidationError {
     },
 }
 
+#[derive(Clone)]
 pub enum ValidationWarning {
     InsecureConfiguration { reason: String },
     ResourceRisk { reason: String },
     DeprecatedField { field: String },
 }
 
+#[derive(Clone)]
 pub struct ConfigValidationResult {
     pub errors: Vec<ValidationError>,
     pub warnings: Vec<ValidationWarning>,
