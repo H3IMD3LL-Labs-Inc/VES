@@ -86,9 +86,11 @@ fn build_apply_plan(diff: &RootConfigDiff) -> Result<ApplyPlan, String> {
 
     config_dependency_order(&mut subsystems)?;
 
+    let total_steps = subsystems.len();
+
     Ok(ApplyPlan {
         steps: subsystems,
-        total_steps: subsystems.len(),
+        total_steps,
     })
 }
 
