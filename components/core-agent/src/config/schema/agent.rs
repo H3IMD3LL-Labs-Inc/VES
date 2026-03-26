@@ -31,8 +31,7 @@ pub enum EnvironmentProvider {
 
 #[derive(Clone, PartialEq)]
 pub enum HEIMDELLServer {
-    // [TODO]: Information about the HEIMDELL Server tied to
-    //         the Core Agent
+    // [TODO]: Information about the HEIMDELL Server tied to the Core Agent
 }
 
 #[derive(Clone, PartialEq)]
@@ -56,7 +55,7 @@ pub enum Compression {
     Zstd,
 }
 
-#[derive(Clone, PartialEq)]
+#[derive(Default, Clone, PartialEq)]
 pub struct CoreAgentConfig {
     pub identity: IdentityConfig,
     pub data_batching: BatchingConfig,
@@ -64,10 +63,10 @@ pub struct CoreAgentConfig {
     pub network: Option<NetworkConfig>,
     pub runtime: RuntimeConfig,
     pub data_buffering: BufferConfig,
-    pub telemetry: TelemetryConfig,
+    pub telemetry: Option<TelemetryConfig>,
 }
 
-#[derive(Clone, PartialEq)]
+#[derive(Default, Clone, PartialEq)]
 pub struct IdentityConfig {
     pub heimdell_server: Option<HEIMDELLServer>,
     pub node_id: String,
@@ -76,14 +75,14 @@ pub struct IdentityConfig {
     pub environment_provider: Option<EnvironmentProvider>,
 }
 
-#[derive(Clone, PartialEq)]
+#[derive(Default, Clone, PartialEq)]
 pub struct BatchingConfig {
     pub max_events: usize,
     pub max_batch_bytes: usize,
     pub flush_interval: Duration,
 }
 
-#[derive(Clone, PartialEq)]
+#[derive(Default, Clone, PartialEq)]
 pub struct RetryConfig {
     pub max_attempts: u32,
     pub initial_backoff: Duration,
@@ -98,13 +97,13 @@ pub struct NetworkConfig {
     pub compression: Compression,
 }
 
-#[derive(Clone, PartialEq)]
+#[derive(Default, Clone, PartialEq)]
 pub struct RuntimeConfig {
     pub processor_worker_threads: usize,
     pub max_parallel_sources: usize,
 }
 
-#[derive(Clone, PartialEq)]
+#[derive(Default, Clone, PartialEq)]
 pub struct BufferConfig {
     pub max_memory_bytes: usize,
     pub backpressure_threshold: usize,
