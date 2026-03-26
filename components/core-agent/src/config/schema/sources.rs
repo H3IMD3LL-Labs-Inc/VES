@@ -39,7 +39,7 @@ pub enum BindAddress {
     }
 }
 
-#[derive(Clone, PartialEq)]
+#[derive(Default, Clone, PartialEq)]
 pub struct SourcesConfig {
     pub filesystem: Vec<FilesystemSourceConfig>,
     pub journald: Vec<JournaldSourceConfig>,

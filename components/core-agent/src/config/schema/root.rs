@@ -28,6 +28,7 @@ pub enum ConfigProvider {
     LocalRemoteAPI,
 }
 
+#[derive(Clone)]
 pub struct RootConfig {
     pub agent: CoreAgentConfig,
     pub sources: SourcesConfig,
@@ -37,6 +38,20 @@ pub struct RootConfig {
     pub security: Option<SecurityConfig>,
 }
 
+impl RootConfig {
+    pub fn empty() -> Self {
+        Self {
+            agent: Default::default(),
+            sources: Default::default(),
+            processor: Default::default(),
+            metadata: None,
+            storage: None,
+            security: None,
+        }
+    }
+}
+
+#[derive(Clone)]
 pub struct RootConfigMetadata {
     pub name: Option<String>,
     pub description: Option<String>,
