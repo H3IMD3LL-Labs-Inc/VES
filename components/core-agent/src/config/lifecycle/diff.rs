@@ -15,12 +15,14 @@ use crate::config::schema::{
 use std::collections::HashMap;
 use std::mem::discriminant;
 
+#[derive(Clone)]
 pub struct RootConfigDiff {
     pub has_changes: bool,
     pub operations: Vec<Operation>,
     pub validation_errors: Vec<String>,
 }
 
+#[derive(Clone)]
 pub enum Operation {
     UpdateCoreAgentRuntime(CoreAgentConfig),
 
