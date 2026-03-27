@@ -11,7 +11,8 @@ use crate::config::{
             ConfigValidation,
             ApplyStatus
         },
-    }
+    },
+    persistence::ConfigPersist,
 };
 
 use std::time::SystemTime;
@@ -29,11 +30,12 @@ impl ConfigManager {
         }
     }
 
-    pub fn process_config(
+    pub fn process_config<P: ConfigPersist>(
         &mut self,
         source: ConfigProvider,
         config: RootConfig,
         raw_bytes: &[u8],
+        persister: &P,
     ) -> Vec<ConfigEvent> {
         let mut events = Vec::new();
 
@@ -107,6 +109,19 @@ impl ConfigManager {
                     version: version.clone(),
                     status: ApplyStatus::Succeeded,
                 });
+
+                match persist_config(persister, raw_bytes) {
+                    Ok(_) => {
+                        events.push(ConfigEvent::PersistedSnapshot { version });
+                    }
+                    Err(e) => {
+                        events.push(ConfigEvent::PersistFailed {
+                            source,
+                            version,
+                            error: e.to_string(),
+                        });
+                    }
+                }
             }
             Err(e) => {
                 events.push(ConfigEvent::SnapshotApplied {
@@ -119,14 +134,17 @@ impl ConfigManager {
             }
         }
 
-        // [TODO]: Perform actual persistence of the successfully applied
-        //         RootConfig as the "latest" state/config
-        events.push(ConfigEvent::PersistedSnapshot { version });
-
         events
     }
 }
 
 fn diff_empty_root_config(new: &RootConfig) -> RootConfigDiff {
     diff_root(&RootConfig::empty(), new)
+}
+
+fn persist_config<P: ConfigPersist>(
+    persistence: &P,
+    raw_bytes: &[u8],
+) -> Result<(), lmdb::Error> {
+    persistence.persist(raw_bytes)
 }
