@@ -1,4 +1,3 @@
-// Local crates
 use crate::recovery::{
     environment::PersistenceEngine,
     transaction::{
@@ -7,7 +6,6 @@ use crate::recovery::{
     },
 };
 
-// External crates
 use lmdb::{
     RwTransaction,
     Database,
@@ -16,11 +14,11 @@ use lmdb::{
 };
 
 pub struct TxnWriter<'a> {
-    env: &'a PersistenceEngine,
+    pub env: &'a PersistenceEngine,
 }
 
 impl<'a> TxnWriter<'a> {
-    fn write<F, T>(&self, f: F) -> Result<T, DbError>
+    pub fn write<F, T>(&self, f: F) -> Result<T, DbError>
     where
         F: FnOnce(&mut RwTransaction) -> Result<TxOutcome<T>, DbError>
     {
