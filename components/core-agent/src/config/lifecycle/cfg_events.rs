@@ -56,4 +56,9 @@ pub enum ConfigEvent {
     PersistedSnapshot {
         version: ConfigVersion,
     },
+    PersistFailed {
+        source: ConfigProvider,
+        version: ConfigVersion,
+        error: String,
+    }
 }
