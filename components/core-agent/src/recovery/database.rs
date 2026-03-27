@@ -12,6 +12,7 @@ pub struct AllowedDatabases {
     pub engine: PersistenceEngine,
     pub watcher_db: Database,
     pub tailer_db: Database,
+    pub persisted_config_db: Database,
 }
 
 impl AllowedDatabases {
@@ -24,10 +25,15 @@ impl AllowedDatabases {
             .engine
             .create_db(Some("tailer_db"), DatabaseFlags::empty())?;
 
+        let persisted_config_db = env
+            .engine
+            .create_db(Some("persisted_config"), DatabaseFlags::empty())?;
+
         Ok(Self {
             engine: env,
             watcher_db,
             tailer_db,
+            persisted_config_db,
         })
     }
 }
