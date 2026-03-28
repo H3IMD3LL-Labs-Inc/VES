@@ -2,6 +2,7 @@
 members = [
     "components/core-agent",
     "components/heimdell",
+    "components/ves_lib",
 ]
 resolver = "2"
 
