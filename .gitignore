@@ -2,3 +2,4 @@
 components/core-agent/ADR/
 nohup.out
 scripts
+components/ves_lib/codegen
