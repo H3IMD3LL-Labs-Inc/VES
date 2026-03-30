@@ -43,7 +43,6 @@ impl<'a> ConfigLoader for LmdbConfigStore<'a> {
     fn load(&self) -> Result<Option<Vec<u8>>, DbError> {
         let mut result = None;
 
-        // [TODO]: Replace with an actual read transaction from txn_reader.rs
         self.writer.write(|txn| {
             match txn.get(self.dbs.persisted_config_db, &LATEST_ROOT_CONFIG_KEY) {
                 Ok(val) => result = Some(val.to_vec()),
