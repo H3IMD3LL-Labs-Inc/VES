@@ -33,9 +33,6 @@ toml.workspace = true
 r2d2.workspace = true
 r2d2_sqlite.workspace = true
 rusqlite.workspace = true
-tonic.workspace = true
-prost.workspace = true
-tonic-prost.workspace = true
 rand.workspace = true
 thiserror.workspace = true
 config.workspace = true
@@ -59,7 +56,6 @@ sha2.workspace = true
 hex.workspace = true
 
 [build-dependencies]
-tonic-prost-build = "0.14.2"
 
 [dev-dependencies]
 criterion = { version = "0.8.2", features = ["html_reports", "stable", "default"] }
