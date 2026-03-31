@@ -58,7 +58,7 @@ pub enum ConfigEvent {
     },
     PersistFailed {
         source: ConfigProvider,
-        version: ConfigVersion,
+        version: Option<ConfigVersion>,
         error: String,
     }
 }
