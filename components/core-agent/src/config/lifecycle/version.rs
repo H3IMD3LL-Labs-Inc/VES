@@ -1,3 +1,8 @@
+use crate::config::{
+    schema::root::RootConfig,
+    persistence::helpers::serialize::serialize_root_config,
+};
+
 use sha2::{Digest, Sha256};
 use hex;
 use std::fmt;
@@ -20,8 +25,9 @@ impl ConfigVersion {
         }
     }
 
-    pub fn from_root_config_bytes(config_bytes: &[u8]) -> Self {
-        Self::from_bytes(config_bytes, None)
+    pub fn from_root_config(config: &RootConfig) -> Self {
+        let bytes = serialize_root_config(config);
+        Self::from_bytes(&bytes, None)
     }
 
     pub fn short(&self) -> &str {
