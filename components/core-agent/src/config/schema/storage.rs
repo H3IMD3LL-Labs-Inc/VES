@@ -3,12 +3,14 @@
 // using LMDB via the Core Agent's recovery/ module
 // =============================================================================
 
-#[derive(Clone, PartialEq)]
+use serde::{Serialize, Deserialize};
+
+#[derive(Serialize, Deserialize, Clone, PartialEq)]
 pub enum StorageEngine {
     Lmdb,
 }
 
-#[derive(Clone, PartialEq)]
+#[derive(Serialize, Deserialize, Clone, PartialEq)]
 pub struct StorageConfig {
     pub data_dir: String,
     pub storage_engine: StorageEngine,
@@ -16,7 +18,7 @@ pub struct StorageConfig {
     pub cleanup: Option<CleanupPolicy>,
 }
 
-#[derive(Clone, PartialEq)]
+#[derive(Serialize, Deserialize, Clone, PartialEq)]
 pub struct CleanupPolicy {
     pub max_period_secs: Option<u64>,
     pub interval_secs: u64,
