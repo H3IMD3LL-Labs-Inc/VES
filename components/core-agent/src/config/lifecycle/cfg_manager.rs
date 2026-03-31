@@ -39,7 +39,7 @@ impl ConfigManager {
     ) -> Vec<ConfigEvent> {
         let mut events = Vec::new();
 
-        let version = ConfigVersion::from_root_config_bytes(raw_bytes);
+        let version = ConfigVersion::from_root_config(&config);
 
         if self.last_applied_version.as_ref() == Some(&version) {
             return events;
