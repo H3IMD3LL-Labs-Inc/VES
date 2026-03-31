@@ -21,14 +21,16 @@ use crate::config::schema::{
     storage::StorageConfig,
 };
 
-#[derive(Debug, Clone)]
+use serde::{Serialize, Deserialize};
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub enum ConfigProvider {
     StaticFile,
     HEIMDELLServerRemoteAPI,
     LocalRemoteAPI,
 }
 
-#[derive(Clone)]
+#[derive(Serialize, Deserialize, Clone)]
 pub struct RootConfig {
     pub agent: CoreAgentConfig,
     pub sources: SourcesConfig,
@@ -51,7 +53,7 @@ impl RootConfig {
     }
 }
 
-#[derive(Clone)]
+#[derive(Serialize, Deserialize, Clone)]
 pub struct RootConfigMetadata {
     pub name: Option<String>,
     pub description: Option<String>,

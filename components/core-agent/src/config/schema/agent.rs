@@ -12,8 +12,9 @@
 // ===================================================================================
 
 use std::time::Duration;
+use serde::{Serialize, Deserialize};
 
-#[derive(Clone, PartialEq)]
+#[derive(Serialize, Deserialize, Clone, PartialEq)]
 pub enum EnvironmentProvider {
     Static,
     Host,
@@ -29,18 +30,18 @@ pub enum EnvironmentProvider {
     Custom,
 }
 
-#[derive(Clone, PartialEq)]
+#[derive(Serialize, Deserialize, Clone, PartialEq)]
 pub enum HEIMDELLServer {
     // [TODO]: Information about the HEIMDELL Server tied to the Core Agent
 }
 
-#[derive(Clone, PartialEq)]
+#[derive(Serialize, Deserialize, Clone, PartialEq)]
 pub enum NetworkProtocol {
     Grpc,
     Http,
 }
 
-#[derive(Clone, PartialEq)]
+#[derive(Serialize, Deserialize, Clone, PartialEq)]
 pub enum LogLevel {
     Trace,
     Error,
@@ -49,13 +50,13 @@ pub enum LogLevel {
     Info,
 }
 
-#[derive(Clone, PartialEq)]
+#[derive(Serialize, Deserialize, Clone, PartialEq)]
 pub enum Compression {
     Gzip,
     Zstd,
 }
 
-#[derive(Default, Clone, PartialEq)]
+#[derive(Serialize, Deserialize, Default, Clone, PartialEq)]
 pub struct CoreAgentConfig {
     pub identity: IdentityConfig,
     pub data_batching: BatchingConfig,
@@ -66,7 +67,7 @@ pub struct CoreAgentConfig {
     pub telemetry: Option<TelemetryConfig>,
 }
 
-#[derive(Default, Clone, PartialEq)]
+#[derive(Serialize, Deserialize, Default, Clone, PartialEq)]
 pub struct IdentityConfig {
     pub heimdell_server: Option<HEIMDELLServer>,
     pub node_id: String,
@@ -75,21 +76,21 @@ pub struct IdentityConfig {
     pub environment_provider: Option<EnvironmentProvider>,
 }
 
-#[derive(Default, Clone, PartialEq)]
+#[derive(Serialize, Deserialize, Default, Clone, PartialEq)]
 pub struct BatchingConfig {
     pub max_events: usize,
     pub max_batch_bytes: usize,
     pub flush_interval: Duration,
 }
 
-#[derive(Default, Clone, PartialEq)]
+#[derive(Serialize, Deserialize, Default, Clone, PartialEq)]
 pub struct RetryConfig {
     pub max_attempts: u32,
     pub initial_backoff: Duration,
     pub max_backoff: Duration,
 }
 
-#[derive(Clone, PartialEq)]
+#[derive(Serialize, Deserialize, Clone, PartialEq)]
 pub struct NetworkConfig {
     pub heimdell_server_endpoint: String,
     pub protocol: NetworkProtocol,
@@ -97,19 +98,19 @@ pub struct NetworkConfig {
     pub compression: Compression,
 }
 
-#[derive(Default, Clone, PartialEq)]
+#[derive(Serialize, Deserialize, Default, Clone, PartialEq)]
 pub struct RuntimeConfig {
     pub processor_worker_threads: usize,
     pub max_parallel_sources: usize,
 }
 
-#[derive(Default, Clone, PartialEq)]
+#[derive(Serialize, Deserialize, Default, Clone, PartialEq)]
 pub struct BufferConfig {
     pub max_memory_bytes: usize,
     pub backpressure_threshold: usize,
 }
 
-#[derive(Clone, PartialEq)]
+#[derive(Serialize, Deserialize, Clone, PartialEq)]
 pub struct TelemetryConfig {
     pub metrics_enabled: bool,
     pub metrics_port: Option<u16>,
