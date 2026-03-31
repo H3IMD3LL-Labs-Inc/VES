@@ -117,7 +117,7 @@ impl ConfigManager {
                     Err(e) => {
                         events.push(ConfigEvent::PersistFailed {
                             source,
-                            version,
+                            version: None,
                             error: e.to_string(),
                         });
                     }
