@@ -32,7 +32,7 @@
 </p>
 
 <p align="center">
-    <a href="https://ves.heimdelllabs.cloud/"><strong>Download Core Agent (Coming Soon)</strong></a> - <a href="https://x.com/heimdell_labs"><strong>X/Twitter</strong></a> - <a href="https://github.com/H3IMD3LL-Labs-Inc/VES/issues"><strong>Roadmap</strong></a>
+    <a href="https://discord.gg/Txak2Ggv?event=1489261046488236149"><strong>DevLog</strong></a> - <a href="https://discord.gg/Md6c9prppU"><strong>Discord</strong></a> - <a href="https://x.com/heimdell_labs"><strong>X/Twitter</strong></a> - <a href="https://github.com/H3IMD3LL-Labs-Inc/VES/issues"><strong>Roadmap</strong></a>
 </p>
 
 <p align="center">
@@ -40,12 +40,12 @@
 </p>
 
 ## What Is VES?
-[VES](https://ves.heimdelllabs.cloud/) is an open source observability data platform for small teams, and later AI Agents. Allowing small teams to keep shipping fast without worrying about maintaining complex and bloated observability tooling.
+[VES](https://ves.heimdelllabs.cloud/) is an open source observability data platform for small teams, and AI Agents. Allowing small teams to keep shipping fast without worrying about maintaining complex and bloated observability infrastructure
 
 ## Roadmap
 See [Issues](https://github.com/H3IMD3LL-Labs-Inc/VES/issues).
 
-> The goal is to release the [core-agent](https://github.com/H3IMD3LL-Labs-Inc/VES/tree/v1.0.0-unstable/components/core-agent) `v1.0.0-stable` by April
+> Expect the [core-agent](https://github.com/H3IMD3LL-Labs-Inc/VES/tree/v1.0.0-unstable/components/core-agent) `v1.0.0-stable` by April 30th 2026
 
 ## Contributing
 All contributions make VES better and help achieve the goals set out for the project. See [How can I contribute](contributing.md) and star the repo 🌟
