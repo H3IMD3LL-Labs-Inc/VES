@@ -1,0 +1,14 @@
+version: v2
+plugins:
+  - local: protoc-gen-buffa
+    out: components/ves_lib/codegen/buffa
+    opt: [views=true, json=true]
+  - local: protoc-gen-buffa-packaging
+    out: components/ves_lib/codegen/buffa
+    strategy: all
+  - local: protoc-gen-connect-rust
+    out: components/ves_lib/codegen/connect
+    opt: [buffa_module=crate::proto]
+  - local: protoc-gen-buffa-packaging
+    out: components/ves_lib/codegen/connect
+    opt: [filter=services]
