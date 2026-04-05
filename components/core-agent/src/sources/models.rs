@@ -8,6 +8,7 @@ pub struct SourcePayload {
     pub size: usize,
 }
 
+#[derive(Debug, Clone, Hash, PartialEq, Eq)]
 pub enum SourceOrigin {
     File {
         path: PathBuf,
@@ -26,6 +27,7 @@ pub enum SourceOrigin {
     },
 }
 
+#[derive(Debug, Clone, Hash, PartialEq, Eq)]
 pub enum Protocol {
     Tcp,
 }

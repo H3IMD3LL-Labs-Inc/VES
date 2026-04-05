@@ -4,7 +4,7 @@ docs:
 
 adr:
   - changed-files:
-    - any-glob-to-any-file: ADR/*
+    - any-glob-to-any-file: Architecture_Docs/*
 
 core-agent:
   - changed-files:
