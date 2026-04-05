@@ -1,5 +1,5 @@
 /target
-components/core-agent/ADR/
+components/Architecture_Docs/
 nohup.out
 scripts
 components/ves_lib/codegen
