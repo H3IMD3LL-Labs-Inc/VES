@@ -3,6 +3,7 @@ members = [
     "components/core-agent",
     "components/heimdell",
     "components/ves_lib",
+    "nidavellir_svartalheim",
 ]
 resolver = "2"
 
@@ -73,6 +74,7 @@ lmdb = "0.8.0"
 lmdb-sys = "0.8.0"
 sha2 = "0.10.9"
 hex = "0.4.3"
+ratatui = "0.30.0"
 
 [profile.dev]
 opt-level = 0
