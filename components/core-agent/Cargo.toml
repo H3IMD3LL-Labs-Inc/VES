@@ -54,6 +54,7 @@ lmdb.workspace = true
 lmdb-sys.workspace = true
 sha2.workspace = true
 hex.workspace = true
+ratatui.workspace = true
 
 [build-dependencies]
 
