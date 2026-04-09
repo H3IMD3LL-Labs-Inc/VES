@@ -4,8 +4,10 @@ use std::collections::HashMap;
 use chrono::{DateTime, Utc};
 
 pub const LOG_EVENT_VERSION: u16 = 1;
+
 pub type EventMap = HashMap<String, Value>;
 
+#[derive(Clone)]
 pub enum Severity {
     Trace,
     Debug,
@@ -16,6 +18,7 @@ pub enum Severity {
     Unknown,
 }
 
+#[derive(Clone)]
 pub enum Value {
     String(String),
     Int(i64),
@@ -24,6 +27,7 @@ pub enum Value {
     Null,
 }
 
+#[derive(Clone)]
 pub struct LogEvent {
     pub version: u16,
     pub timestamp: DateTime<Utc>,
@@ -34,6 +38,7 @@ pub struct LogEvent {
     pub origin: SourceOrigin,
 }
 
+#[derive(Clone)]
 pub struct IntermediateEvent {
     pub timestamp: Option<String>,
     pub severity: Option<Severity>,

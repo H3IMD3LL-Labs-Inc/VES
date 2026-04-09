@@ -3,11 +3,19 @@ use super::format::{
     FormatDetector,
 };
 use super::traits::Parser;
-use super::types::IntermediateEvent;
+use super::types::LogEvent;
 use super::error::ParserError;
 use crate::sources::models::{SourceOrigin, SourcePayload};
 
 use std::collections::HashMap;
+use ves_lib::cache::traits::Cache;
+use crate::processor::parser::cache::{
+    build_parser_cache,
+    CachedParseResult,
+    ParserCacheKey,
+    ParserCache,
+};
+use super::normalizer::Normalizer;
 
 pub struct FormatDetectionState {
     pub locked_format: Option<Format>,
@@ -131,6 +139,7 @@ pub struct ParserEngine {
     registry: ParserRegistry,
     detection: FormatDetectionManager,
     config: Option<ParserConfig>,
+    cache: ParserCache,
 }
 
 impl ParserEngine {
@@ -139,18 +148,22 @@ impl ParserEngine {
             registry,
             detection: FormatDetectionManager::new(),
             config,
+            cache: build_parser_cache(),
         }
     }
 
-    pub fn parse(&mut self, payload: &SourcePayload) -> Result<IntermediateEvent, ParserError> {
+    pub fn parse(&mut self, payload: &SourcePayload) -> Result<LogEvent, ParserError> {
+        let key = ParserCacheKey::from_raw(&payload.raw_data);
+
+        if let Ok(Some(cached)) = self.cache.get(&key) {
+            return Ok(cached.event);
+        }
+
         let format = if let Some(config) = &self.config {
-            if let Some(f) = config.get_format_override(&payload.origin) {
-                f
-            } else {
-                self.detection.resolve_format(&payload)
-            }
+            config.get_format_override(&payload.origin)
+                .unwrap_or_else(|| self.detection.resolve_format(payload))
         } else {
-            self.detection.resolve_format(&payload)
+            self.detection.resolve_format(payload)
         };
 
         let parser = self
@@ -159,17 +172,30 @@ impl ParserEngine {
             .or_else(|| self.registry.get_parser(&Format::PlainText))
             .ok_or(ParserError::UnsupportedFormat)?;
 
-        match parser.parse_raw_data(payload) {
-            Ok(event) => Ok(event),
+        let intermediate_event = match parser.parse_raw_data(payload) {
+            Ok(event) => event,
             Err(_) => {
                 let fallback = self
                     .registry
                     .get_parser(&Format::PlainText)
                     .ok_or(ParserError::UnsupportedFormat)?;
-
-                fallback.parse_raw_data(payload)
+                fallback.parse_raw_data(payload)?
             }
-        }
+        };
+
+        let event = Normalizer::normalize(intermediate_event);
+
+        /// ;) failure is silently discarded because caching must never
+        /// affect correctness per the ADR
+        let _ = self.cache.insert(key, CachedParseResult {
+            event: event.clone(),
+        });
+
+        Ok(event)
+    }
+
+    pub fn cache_metrics(&self) -> ves_lib::cache::metrics::CacheMetricsSnapshot {
+        self.cache.snapshot()
     }
 }
 
