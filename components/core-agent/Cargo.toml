@@ -15,6 +15,7 @@ autobenches = false
 workspace = true
 
 [dependencies]
+ves_lib = { path = "../ves_lib" }
 anyhow.workspace = true
 tokio.workspace = true
 tokio-util.workspace = true
