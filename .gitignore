@@ -2,7 +2,8 @@
 components/Architecture_Docs/
 nohup.out
 scripts
-components/ves_lib/codegen
+components/ves_lib/src/codegen
 proto
 .idea
 nidavellir_svartalheim
+components/ves_lib/src/cache/README.md
