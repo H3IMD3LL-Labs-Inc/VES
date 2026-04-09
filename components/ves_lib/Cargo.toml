@@ -11,6 +11,14 @@ homepage.workspace = true
 readme.workspace = true
 
 [dependencies]
+thiserror = "2"
+moka = { version = "0.12", optional = true }
+quick_cache = { version = "0.6", optional = true }
+
+[features]
+default = []
+moka = ["dep:moka"]
+quick_cache = ["dep:quick_cache"]
 
 [lints]
 workspace = true
